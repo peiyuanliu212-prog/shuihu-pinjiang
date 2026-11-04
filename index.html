@@ -3938,7 +3938,7 @@ const AVATAR_IMG = {
  "蔡福": "assets/portraits/caifu.webp"
 };
 function avatarHTML(name, cls) { const ch = (name || '？').slice(0, 1); const src = AVATAR_IMG[name];
-  if (src) return `<span class="avatar ph ${cls || ''}"><img src="${src}" alt="${name}" decoding="async" onerror="if(!this.dataset.r){this.dataset.r=1;this.src=this.src.split('?')[0]+'?r=1';}else{this.remove();}"><i>${ch}</i></span>`;
+  if (src) return `<span class="avatar ph ${cls || ''}"><img src="${src}" alt="${name}" loading="lazy" decoding="async" onerror="if(!this.dataset.r){this.dataset.r=1;this.src=this.src.split('?')[0]+'?r=1';}else{this.remove();}"><i>${ch}</i></span>`;
   return `<span class="avatar ph ${cls || ''}"><i>${ch}</i></span>`; }
 function renderDraft() {
   renderMinePanel();
