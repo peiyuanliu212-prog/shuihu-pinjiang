@@ -199,6 +199,7 @@ h3 { font-size: 15px; margin-bottom: 8px; }
 .bond-badge.on { color: #2e7d4f; border-color: #9fc7ab; background: #eef7f0; }
 .bond-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .bond-chip { font-size: 14px; font-weight: 700; line-height: 1.55; color: #8f2a1e; background: #fff3d6; border: 1.5px solid #b3352c; border-radius: 10px; padding: 4px 11px; }
+.bond-chip .bond-sub { display: block; font-size: 11.5px; font-weight: 600; line-height: 1.5; opacity: .88; }
 .bond-chip.on { color: #fff; background: #2e7d4f; border-color: #2e7d4f; }
 .bond-chip.fx { color: #7a5b12; background: #fdf3e3; border-color: #c9a227; }
 .bond-bar { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -3740,7 +3741,7 @@ const S = {
   finalChoice: null, deadPending: false, endingId: null, score: 0, factionPicks: {}, deathVariant: null,
   gamble: false, selfStreak: 0, fate: null,
   lastSettle: null, rewindSnap: null, rewindAvail: false, evDoneCh: null,  /* 判定落盘：本章结算记录/改命快照随档/改命可用标记/已结算事件所属章号 */
-  baseAttrs: {}, bonds: {}, bondFx: 0, foeMarks: [], befriended: {}, chaseUsed: 0, bondChase: null, bondFreeRewind: 0, bondTempNext: false, bondNotes: [], bondLinkUsed: false, bondRewindAvail: false, usedDirectedThisRun: false, radarNext: false,  /* v5.23 羁绊：锁定原值快照/已触发/净加成账/宿敌记账/化敌状态/追羁绊/免费改命/临时骑手/触发记录/轻联动/免费改命可用 */
+  baseAttrs: {}, bonds: {}, bondFx: 0, bondFxText: {}, foeMarks: [], befriended: {}, chaseUsed: 0, bondChase: null, bondFreeRewind: 0, bondTempNext: false, bondNotes: [], bondLinkUsed: false, bondRewindAvail: false, usedDirectedThisRun: false, radarNext: false,  /* v5.23 羁绊：锁定原值快照/已触发/净加成账/宿敌记账/化敌状态/追羁绊/免费改命/临时骑手/触发记录/轻联动/免费改命可用 */
   mode: 'normal', runSeed: 0, scheme: null, dailyKey: '', dailyMod: null, dailyGoal: null  /* v5.19：局模式/种子/方略/每日词缀与目标 */
 };
 
@@ -3934,7 +3935,7 @@ function startDraft() {
   S.attrs = {}; S.lockedFrom = {}; S.claimed = new Set(); S.swapsLeft = 3; S.picks = 0;
   if (S.dailyMod && S.dailyMod.swapsDelta) S.swapsLeft = Math.max(0, S.swapsLeft + S.dailyMod.swapsDelta);  /* v5.19 词缀：一将难求/礼贤下士 */
   S.peaked = {};  /* v5.14：新局重置巅峰唤醒记录 */
-  S.baseAttrs = {}; S.bonds = {}; S.bondFx = 0; S.foeMarks = []; S.befriended = {}; S.chaseUsed = 0; S.bondChase = null; S.bondFreeRewind = 0; S.bondTempNext = false; S.bondNotes = []; S.bondLinkUsed = false; S.bondRewindAvail = false; S.__unveilBase = null;  /* v5.23 羁绊状态重置 */
+  S.baseAttrs = {}; S.bonds = {}; S.bondFx = 0; S.bondFxText = {}; S.foeMarks = []; S.befriended = {}; S.chaseUsed = 0; S.bondChase = null; S.bondFreeRewind = 0; S.bondTempNext = false; S.bondNotes = []; S.bondLinkUsed = false; S.bondRewindAvail = false; S.__unveilBase = null;  /* v5.23 羁绊状态重置 */
   S.usedDirectedThisRun = false; S.radarNext = false;  /* v5.24 定向局内限次（每局 1 次）/羁绊雷达标记重置 */
   directedReady = false;  /* 定向招募资格不跨局 */ try { const __wm = loadMerit(); if (__wm.welfareDirected) { __wm.welfareDirected = false; saveMerit(__wm); directedReady = true; } } catch (e) {} /* 群福利：待用定向资格在本局生效 */
   S.factionPicks = {}; S.deathVariant = null;  /* 阶段二：截教夺技计数（sectJie1 闸门）/ 死亡变体 */
@@ -4220,7 +4221,7 @@ function recomputeBonds() {
   const newly = [];
   S.attrs = {};
   for (const k of ATTR_KEYS) if (k in (S.baseAttrs || {})) S.attrs[k] = S.baseAttrs[k];
-  S.bonds = {}; S.foeMarks = []; S.bondFx = 0;
+  S.bonds = {}; S.foeMarks = []; S.bondFx = 0; S.bondFxText = {};  /* bondFxText：本轮结算明细文案（只记账展示，不参与任何计算） */
   const mark = B => { S.bonds[B.id] = true; if (!prev[B.id]) newly.push(B); };
   /* 第一遍：宿敌（罚值记账 foeMarks=[槽,原值,罚后]；fill 在其上叠加；已化敌状态在重算中回放精确回滚＋各 +4） */
   for (const B of BONDS) {
@@ -4228,19 +4229,23 @@ function recomputeBonds() {
     const locked = bondLockedMembers(B);
     if (locked.length < bondNeedOf(B)) continue;
     mark(B);
+    const foeTxt = [];
     for (const n of locked) {
       const slot = bondSlotOf(n), orig = S.baseAttrs[slot];
       const pen = Math.min(BOND_FOE_CAP, Math.round(orig * BOND_FOE_RATE));
       S.attrs[slot] = orig - pen;
       S.foeMarks.push([slot, orig, orig - pen]);
       S.bondFx -= pen;
+      foeTxt.push(`${n} ${ATTR_NAMES[slot]} ${orig}→${orig - pen}（−${pen}）`);
     }
+    S.bondFxText[B.id] = foeTxt.join(' · ');
     if (S.befriended && S.befriended[B.id]) {
       for (const m of S.foeMarks) {
         if (!bondMembersOf(B).includes(S.lockedFrom[m[0]])) continue;
         const back = (m[1] - m[2]) + BOND_BEFRIEND_PLUS;
         S.attrs[m[0]] += back; S.bondFx += back;
       }
+      S.bondFxText[B.id] = `化敌为友：${locked.map(n => `${n} ${ATTR_NAMES[bondSlotOf(n)]} ${S.baseAttrs[bondSlotOf(n)]}→${S.attrs[bondSlotOf(n)]}（+${S.attrs[bondSlotOf(n)] - S.baseAttrs[bondSlotOf(n)]}）`).join(' · ')}`;
     }
   }
   /* 第二遍：fill / temp / mech / multi 补强 */
@@ -4264,6 +4269,9 @@ function recomputeBonds() {
     locked.forEach((n, i) => {
       S.attrs[bondSlotOf(n)] += gains[i]; S.bondFx += gains[i];
     });
+    S.bondFxText[B.id] = locked.map((n, i) => { const sl = bondSlotOf(n); return `${n} ${ATTR_NAMES[sl]} ${S.baseAttrs[sl]}→${S.attrs[sl]}（+${gains[i]}）`; }).join(' · ');
+    if (B.type === 'temp') S.bondFxText[B.id] += ` · 下一场判定 +${B.rider || BOND_TEMP_RATE}（待生效）`;
+    if (B.type === 'mech') S.bondFxText[B.id] += ' · 免费改命 1 次（待用）';
     if (B.type === 'temp') S.bondTempNext = true;
     if (B.type === 'mech') S.bondFreeRewind = Math.max(S.bondFreeRewind || 0, 1);
   }
@@ -4274,6 +4282,7 @@ function recomputeBonds() {
     if (bondLockedMembers(B).length < bondNeedOf(B)) continue;
     mark(B);
     for (const k of ATTR_KEYS) if (k in S.attrs && S.attrs[k] < 90 && teamGain < BOND_TEAM_CAP) { S.attrs[k]++; teamGain++; S.bondFx++; }
+    S.bondFxText[B.id] = '全队未满 90 的项 +1';
   }
   if (newly.length) {
     try { const c = loadCollection(); let dirty = false; for (const B of newly) if (!c.bondsSeen[B.id]) { c.bondsSeen[B.id] = Date.now(); dirty = true; } if (dirty) saveCollection(c); } catch (e) {}
@@ -4296,19 +4305,36 @@ function bondBadgeHTML(name) {
   if (!bs.length) return '';
   return `<div class="bond-badges">${bs.map(x => `<span class="bond-badge${x.on ? ' on' : ''}">${x.txt}</span>`).join('')}</div>`;
 }
+function bondPlanText(B) {
+  /* 在凑 chip 的预期效果模板：只由 BONDS 配置＋分档常量生成，不读结算值（已触发对的数值一律走 bondFxText 实际结算） */
+  const pairClause = () => {
+    const c = BOND_CLS[B.cls];
+    if (!c || B.cls === 'BASE') return '两人各 +2';
+    return `两人弱项补强（补到 ${typeof B.ref === 'number' ? B.ref : c.ref}，单项最多 +${c.cap}，另 +2）`;
+  };
+  switch (B.type) {
+    case 'fill': return '凑齐：' + pairClause();
+    case 'multi': return `凑齐任意 ${bondNeedOf(B)} 人：` + pairClause().replace('两人', '每人');
+    case 'temp': return `凑齐：${pairClause()}＋下一场判定 +${B.rider || BOND_TEMP_RATE}`;
+    case 'mech': return `凑齐：${pairClause()}＋免费改命 1 次`;
+    case 'foe': return `两人同队：各被夺项扣 ${Math.round(BOND_FOE_RATE * 100)}%（最多 −${BOND_FOE_CAP}），可看广告化敌为友（解扣＋各 +${BOND_BEFRIEND_PLUS}）`;
+    case 'team': return '凑齐：全队未满 90 的项 +1';
+    default: return '';
+  }
+}
 function renderDraftBonds() {
   const el = $('draft-bonds');
   if (!el) return;
   const chips = [];
   for (const B of BONDS) {
-    if (S.bonds && S.bonds[B.id]) chips.push(`<span class="bond-chip on">💞 《${B.name}》✓ 已触发</span>`);
+    if (S.bonds && S.bonds[B.id]) chips.push(`<span class="bond-chip on">💞 《${B.name}》✓ 已触发<span class="bond-sub">${(S.bondFxText && S.bondFxText[B.id]) || ''}</span></span>`);
   }
   for (const B of BONDS) {
     if (S.bonds && S.bonds[B.id]) continue;
     const locked = bondLockedMembers(B);
     if (!locked.length) continue;
     const missing = bondMembersOf(B).filter(n => bondSlotOf(n) === null);
-    chips.push(`<span class="bond-chip">💞 凑羁绊中：《${B.name}》${locked.length}/${bondNeedOf(B)}（待：${missing.join('、')}）</span>`);
+    chips.push(`<span class="bond-chip">💞 凑羁绊中：《${B.name}》${locked.length}/${bondNeedOf(B)}（待：${missing.join('、')}）<span class="bond-sub">${bondPlanText(B)}</span></span>`);
   }
   if (S.radarNext) chips.push('<span class="bond-chip fx">📡 羁绊雷达已开启：下批大概率出缺卡</span>');
   if (S.bondTempNext) chips.push('<span class="bond-chip fx">🌟 《清风寨》余势：下一场判定 +3</span>');
@@ -4321,7 +4347,7 @@ function renderChapterBonds() {
   const el = $('ch-bonds');
   if (!el) return;
   const chips = [];
-  for (const B of BONDS) if (S.bonds && S.bonds[B.id]) chips.push(`<span class="bond-chip on">💞 《${B.name}》✓ 已触发</span>`);
+  for (const B of BONDS) if (S.bonds && S.bonds[B.id]) chips.push(`<span class="bond-chip on">💞 《${B.name}》✓ 已触发<span class="bond-sub">${(S.bondFxText && S.bondFxText[B.id]) || ''}</span></span>`);
   if (chips.length) {
     const tempB = BONDS.find(B => B.type === 'temp');
     if (S.bondTempNext && tempB && S.bonds[tempB.id]) chips.push(`<span class="bond-chip fx">🌟 《${tempB.name}》余势待生效：下一场判定 +${tempB.rider || 3}</span>`);
@@ -6146,6 +6172,7 @@ async function restoreGame() {
   S.foeMarks = Array.isArray(__os.foeMarks) ? __os.foeMarks : [];
   S.befriended = (__os.befriended && typeof __os.befriended === 'object') ? __os.befriended : {};
   S.bondFx = (typeof __os.bondFx === 'number') ? __os.bondFx : 0;
+  S.bondFxText = (__os.bondFxText && typeof __os.bondFxText === 'object') ? __os.bondFxText : {};  /* 展示明细：旧档无此字段为空，恢复后 recompute 会按当前快照重建 */
   S.chaseUsed = (typeof __os.chaseUsed === 'number') ? __os.chaseUsed : 0;
   S.bondChase = (__os.bondChase === undefined) ? null : __os.bondChase;
   S.bondFreeRewind = (typeof __os.bondFreeRewind === 'number') ? __os.bondFreeRewind : 0;
