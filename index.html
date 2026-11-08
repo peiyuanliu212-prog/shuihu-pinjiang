@@ -65,6 +65,8 @@ h3 { font-size: 15px; margin-bottom: 8px; }
 .abar-line b { display: block; height: 100%; background: linear-gradient(90deg, #c39a3b, #c49a48); border-radius: 2px; }
 /* v5.13 事件专属配图位 */
 .ev-art { height: 150px; border-radius: 10px; background-size: cover; background-position: center; margin-bottom: 12px; box-shadow: inset 0 0 0 1px rgba(120,90,40,.25); position: relative; overflow: hidden; }
+/* 性能修复 2026-11-06：图鉴人物格屏外跳过布局/绘制（90+ 格一次性渲染是图鉴打开长任务的主体） */
+.gal-cell { content-visibility: auto; contain-intrinsic-size: auto 94px; }
 /* 图集切格：窗口内一格居中，img 整张图集按格平移 */
 .atlas-cell { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); aspect-ratio: 16 / 9; overflow: hidden; }
 .atlas-img { width: 100%; display: block; }
@@ -192,6 +194,11 @@ h3 { font-size: 15px; margin-bottom: 8px; }
 .notice-item:last-child { margin-bottom: 0; }
 .notice-v { font-weight: 800; color: #c0452f; }
 .modal { position: fixed; inset: 0; background: rgba(26,26,26,.45); display: flex; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
+.bond-badges { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; }
+.bond-badge { font-size: 11px; font-weight: 700; color: #b3352c; background: #fdf3e3; border: 1px solid #e3c98f; border-radius: 8px; padding: 1px 7px; }
+.bond-badge.on { color: #2e7d4f; border-color: #9fc7ab; background: #eef7f0; }
+.bond-bar { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bond-card { border: 1px solid #e3d3ac; background: #fffdf6; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
 .modal-inner { background: #f8f2e0; border-radius: 16px; padding: 22px 18px; max-width: 520px; width: 100%; max-height: 86vh; overflow-y: auto; }
 .modal-title { font-size: 20px; font-weight: 900; margin-bottom: 8px; }
 .ev-story { font-size: 14.5px; line-height: 1.75; }
@@ -330,7 +337,7 @@ body::after { background:
 .lb-rank { width:32px; text-align:center; font-weight:800; flex:none; }
 .lb-row.me { background:#6b5626; border-radius:8px; }
 .lb-name { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.lb-tab { white-space:nowrap; font-size:14px; padding-left:2px; padding-right:2px; }
+.lb-tab { white-space:nowrap; font-size:13.5px; padding-left:2px; padding-right:2px; flex:1 1 30%; min-width:0; box-sizing:border-box; }
 .lb-row.top1 { background:#6b5518; border-radius:8px; }
 .lb-row.top2 { background:#3d4450; border-radius:8px; }
 .lb-row.top3 { background:#5d3f22; border-radius:8px; }
@@ -361,10 +368,12 @@ body::after { background:
       <p class="hero-tag">从宋江、林冲、武松身上一项项夺走本事，拼到一个无名好汉身上——聚义厅的座次，看你最后坐到哪一把交椅。</p>
       <button class="btn-primary btn-big" id="btn-start">⚔️ 开始拼将</button>
       <button class="btn-primary btn-big hidden" id="btn-continue" style="margin-top:10px;background:linear-gradient(180deg,#c0452f,#c0452f);">▶ 继续上局</button>
+      <button class="btn-primary btn-big" id="btn-group" style="margin-top:10px;background:linear-gradient(180deg,#2e7d4f,#1f5c39);">💬 加入拼将交流群</button>
       <div class="hero-note hidden" id="save-info"></div>
       <div class="hero-note" id="merit-chip"></div>
       <button class="btn-ghost" id="btn-records" style="width:100%;margin-top:10px;">🏆 我的战绩榜</button>
       <button class="btn-ghost" id="btn-gallery" style="width:100%;margin-top:8px;">📖 图鉴 · 成就</button>
+      <button class="btn-ghost" id="btn-bonds" style="width:100%;margin-top:8px;">💞 羁绊一览 <span id="bonds-seen-count"></span></button>
       <button class="btn-ghost" id="btn-shop" style="width:100%;margin-top:8px;">🏯 名望商店 <span id="shop-bal"></span></button>
       <button class="btn-ghost" id="btn-archive" style="width:100%;margin-top:8px;">📂 存档</button>
       <button class="btn-ghost" id="btn-notice" style="width:100%;margin-top:8px;">📜 更新公告 <span class="ndot hidden" id="notice-dot"></span></button>
@@ -421,10 +430,13 @@ body::after { background:
       <div id="draft-stage"></div>
       <div class="draft-foot">
         <button class="btn-ghost" id="btn-swap">🔀 换一批（剩 3 次）</button>
-        <button class="btn-ghost hidden" id="btn-ad-swap">📺 看广告换一批</button>
+        <button class="btn-ghost hidden" id="btn-ad-directed">📺 定向招募（看广告，自选来路）</button>
+        <button class="btn-ghost hidden" id="btn-directed-use">🎯 定向招募已就绪（点此选来路）</button>
         <button class="btn-ghost hidden" id="btn-ad-tianming">📺 星运临身（看广告，本批贵人云集）</button>
       </div>
-      <div class="copied hidden" id="ad-toast">已获得 1 次换一批</div>
+      <div class="copied hidden" id="ad-toast">定向招募已就绪</div>
+      <div id="draft-bonds" style="margin-top:8px;line-height:1.8;"></div>
+      <div id="bond-bar" class="bond-bar"></div>
       <div id="draft-locked" class="locked-line"></div>
     </div>
   </section>
@@ -436,6 +448,7 @@ body::after { background:
       <div class="unveil-title" id="unveil-title"></div>
       <div class="unveil-lines" id="unveil-lines"></div>
       <div class="attr-grid" id="unveil-attrs"></div>
+      <div id="bond-bar-unveil" class="bond-bar"></div>
       <button class="btn-primary btn-big" id="btn-to-chapters">揭竿聚义 · 开始二十回 →</button>
     </div>
   </section>
@@ -455,6 +468,7 @@ body::after { background:
       <div id="ch-result" class="ch-result hidden">
         <div id="ch-result-text"></div>
         <button class="btn-ghost hidden" id="btn-ad-rewind" style="width:100%; margin-bottom:10px;">📺 看广告·改命（回到这次抉择之前）</button>
+        <button class="btn-ghost hidden" id="btn-bond-rewind" style="width:100%; margin-bottom:10px;">💞 羁绊·免费改命（回到这次抉择之前）</button>
         <button class="btn-primary" id="btn-chapter-next">继续 →</button>
       </div>
     </div>
@@ -508,12 +522,12 @@ body::after { background:
     <div class="card">
       <h2>🏆 我的战绩榜</h2>
       <p class="hint" id="records-summary"></p>
-      <div style="display:flex;gap:8px;margin:10px 0;">
-        <button class="btn-ghost lb-tab active" data-lb-tab="local" style="flex:1;">本地战绩</button>
-        <button class="btn-ghost lb-tab" data-lb-tab="best" style="flex:1;">🏆 全服最强</button>
-        <button class="btn-ghost lb-tab" data-lb-tab="worst" style="flex:1;">💀 全服最菜</button>
-        <button class="btn-ghost lb-tab" data-lb-tab="dbest" style="flex:1;">☀️ 今日最强</button>
-        <button class="btn-ghost lb-tab" data-lb-tab="dworst" style="flex:1;">🌑 今日最菜</button>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;">
+        <button class="btn-ghost lb-tab active" data-lb-tab="local">本地战绩</button>
+        <button class="btn-ghost lb-tab" data-lb-tab="best">🏆 全服最强</button>
+        <button class="btn-ghost lb-tab" data-lb-tab="worst">💀 全服最菜</button>
+        <button class="btn-ghost lb-tab" data-lb-tab="dbest">☀️ 今日最强</button>
+        <button class="btn-ghost lb-tab" data-lb-tab="dworst">🌑 今日最菜</button>
       </div>
       <div id="records-list"></div>
       <div id="board-panel" class="hidden">
@@ -582,6 +596,20 @@ body::after { background:
       <textarea id="save-code" rows="4" style="width:100%;margin-top:8px;box-sizing:border-box;" placeholder="存档码会出现在这里，或把要导入的码粘贴到这里"></textarea>
       <button class="btn-ghost" id="btn-code-import" style="width:100%;margin-top:8px;">导入存档码（覆盖当前进度）</button>
     </div>
+    <div class="card">
+      <h2>☁️ 云端短码</h2>
+      <p class="hint">把整档登记到云端、换回 8 位短码：换设备时输短码就能取回（需联网）。上面的长码继续保留作离线兜底。</p>
+      <button class="btn-ghost" id="btn-sc-issue" style="width:100%;">生成短码</button>
+      <div id="sc-out" class="hidden" style="text-align:center;margin-top:8px;">
+        <div id="sc-code" style="font-size:26px;font-weight:800;letter-spacing:3px;"></div>
+        <p class="hint">把短码记好，在新设备的这里输入即可取回存档。短码长期有效。</p>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input id="sc-in" placeholder="输入 8 位短码" style="flex:1;text-transform:uppercase;box-sizing:border-box;">
+        <button class="btn-ghost" id="btn-sc-fetch">取回存档</button>
+      </div>
+      <p class="hint" id="sc-msg" style="color:#b3402a;"></p>
+    </div>
     <button class="btn-primary btn-big" id="btn-archive-back" style="width:100%;">← 返回首页</button>
   </section>
 </div>
@@ -590,6 +618,36 @@ body::after { background:
   <div class="modal-title">📜 更新公告</div>
   <div id="notice-list"></div>
   <button class="btn-primary btn-big" id="btn-notice-close" style="margin-top:12px;">关闭</button>
+</div></div>
+
+<div id="welfare-modal" class="modal hidden"><div class="modal-inner">
+  <div class="modal-title">🎁 群福利公告</div>
+  <p class="hint" style="text-align:center;">《拼将》交流群给四作玩家备了进群福利：<b>名望 ×300</b>＋<b>定向招募资格 ×1</b>（每人限领一次）。<br>福利码将在群内发布，开放后在此输入领取；进群扫码在首页「加入拼将交流群」里。</p>
+  <div class="wf-slot"></div>
+  <label class="hint" style="display:block;text-align:center;margin-top:10px;"><input type="checkbox" class="wf-off"> 下次进入不再提醒</label>
+  <button class="btn-primary btn-big wf-close" style="margin-top:12px;">关闭</button>
+</div></div>
+<div id="group-modal" class="modal hidden"><div class="modal-inner">
+  <div class="modal-title">💬 《拼将》玩家交流群</div>
+  <p class="hint" style="text-align:center;">乱世、封神、水浒三作玩家都在这里：聊阵容、晒战绩、报 bug、催更新</p>
+  <img src="data:image/png;base64,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" alt="拼将交流群二维码" style="display:block;width:min(78vw,300px);margin:10px auto;border-radius:8px;">
+  <p class="hint" style="text-align:center;">先截图保存，再打开微信扫一扫、选相册识别</p>
+  <p class="hint" style="text-align:center;">本群码 11 月 11 日前有效，过期后看最新公告换新码</p>
+  <div class="wf-slot"></div>
+  <button class="btn-primary btn-big" id="btn-group-close" style="margin-top:12px;">关闭</button>
+</div></div>
+
+<div id="bonds-modal" class="modal hidden"><div class="modal-inner">
+    <h3 style="margin:0 0 6px;">💞 羁绊一览 <span id="bonds-seen-count2" style="font-size:13px;color:#8a6d1f;"></span></h3>
+    <p class="hint" style="margin-bottom:10px;line-height:1.8;">同一局里把配对的好汉都夺过技，羁绊当场触发。已锁一员后，其搭档在后续候选里更容易出现；急着凑齐，可以看广告「追羁绊」让搭档下一批必出。《招安之争》触发后，看广告「化敌为友《替天行道》」可以解开宿敌。</p>
+    <div id="bonds-list"></div>
+    <button class="btn-ghost" id="btn-bonds-close" style="width:100%;margin-top:6px;">关闭</button>
+  </div></div>
+<div id="directed-modal" class="modal hidden"><div class="modal-inner">
+  <div class="modal-title">🎯 定向招募：选一个来路</div>
+  <p class="hint">本批将全部换成所选来路的人物（按普通权重抽取）。</p>
+  <div id="directed-list"></div>
+  <button class="btn-ghost" id="btn-directed-cancel" style="margin-top:12px;">先不换（资格保留）</button>
 </div></div>
 
 <div id="g-toast" class="hidden" style="position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99;background:#2e2416;color:#e9dcba;padding:10px 18px;border-radius:999px;border:1px solid #b03a2e;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.35);white-space:nowrap;"></div>
@@ -887,7 +945,7 @@ const FACTIONS = [
     "name": "戴宗",
     "route": "枭雄",
     "tier": "A",
-    "special": "nerve",
+    "special": "insight",
     "origin": "官身",
     "sectTag": "天速星",
     "stance": "神行太保",
@@ -1485,7 +1543,7 @@ const FACTIONS = [
     "name": "乐和",
     "route": "枭雄",
     "tier": "D",
-    "special": "charisma",
+    "special": "literature",
     "origin": "官身",
     "sectTag": "地乐星",
     "stance": "铁叫子",
@@ -1699,7 +1757,7 @@ const FACTIONS = [
     "name": "时迁",
     "route": "枭雄",
     "tier": "A",
-    "special": "nerve",
+    "special": "insight",
     "origin": "市井",
     "sectTag": "地贼星",
     "stance": "鼓上蚤",
@@ -3675,6 +3733,8 @@ const S = {
   bios: [], eventsUsed: [], eventsFired: 0,
   finalChoice: null, deadPending: false, endingId: null, score: 0, factionPicks: {}, deathVariant: null,
   gamble: false, selfStreak: 0, fate: null,
+  lastSettle: null, rewindSnap: null, rewindAvail: false, evDoneCh: null,  /* 判定落盘：本章结算记录/改命快照随档/改命可用标记/已结算事件所属章号 */
+  baseAttrs: {}, bonds: {}, bondFx: 0, foeMarks: [], befriended: {}, chaseUsed: 0, bondChase: null, bondFreeRewind: 0, bondTempNext: false, bondNotes: [], bondLinkUsed: false, bondRewindAvail: false,  /* v5.23 羁绊：锁定原值快照/已触发/净加成账/宿敌记账/化敌状态/追羁绊/免费改命/临时骑手/触发记录/轻联动/免费改命可用 */
   mode: 'normal', runSeed: 0, scheme: null, dailyKey: '', dailyMod: null, dailyGoal: null  /* v5.19：局模式/种子/方略/每日词缀与目标 */
 };
 
@@ -3723,14 +3783,73 @@ function syncSetupBtn() { $('btn-to-draft').disabled = !(S.route && S.origin && 
 /* ---------- 夺技 ---------- */
 function factionExhausted(f) { return f.people.every(p => S.claimed.has(f.name + '-' + p.name)); }
 function rollFaction() {
+  /* v5.23 追羁绊：待追搭档强制进下一批——切到搭档所在来路，搭档占一个名额 */
+  if (S.bondChase) {
+    const target = S.bondChase; S.bondChase = null;
+    const tf = FACTIONS.find(x => x.people.some(p => p.name === target && !S.claimed.has(x.name + '-' + p.name)));
+    if (tf) {
+      S.faction = tf; S.person = null; S.poolAttrs = {};
+      const unc = tf.people.filter(p => !S.claimed.has(tf.name + '-' + p.name));
+      S.batch = drawBatch(unc, tianmingBoost); tianmingBoost = false;
+      if (!S.batch.some(p => p.name === target)) {
+        const tp = unc.find(p => p.name === target);
+        if (tp) { if (S.batch.length >= 5) S.batch[S.batch.length - 1] = tp; else S.batch.push(tp); }
+      }
+      S.batch.forEach(p => { S.poolAttrs[p.name] = genPlayerAttr(p.route, effTier(p), p.special, p.name); });
+      return;
+    }
+  }
   const avail = FACTIONS.filter(f => !factionExhausted(f));
   S.faction = pick(avail);
   S.person = null;
   S.poolAttrs = {};
   const unclaimed = S.faction.people.filter(p => !S.claimed.has(S.faction.name + '-' + p.name));
-  S.batch = drawBatch(unclaimed, tianmingBoost);
+  /* v5.23 免费轻联动（定案 v1 可达性）：已锁羁绊一员后，其搭档若在本批来路候选中权重 ×1.5，每局至多生效一批；每日挑战禁用（保同题纯度） */
+  let linkName = null;
+  if (S.mode !== 'daily' && !S.bondLinkUsed) {
+    for (const B of BONDS) {
+      if (B.type === 'multi' || (S.bonds && S.bonds[B.id])) continue;
+      const ms = bondMembersOf(B);
+      const locked = ms.filter(n => bondSlotOf(n) !== null);
+      const missing = ms.filter(n => bondSlotOf(n) === null);
+      if (locked.length === 1 && missing.length === 1 && unclaimed.some(p => p.name === missing[0])) { linkName = missing[0]; S.bondLinkUsed = true; break; }
+    }
+  }
+  S.batch = drawBatch(unclaimed, tianmingBoost, linkName);
   tianmingBoost = false;
   S.batch.forEach(p => { S.poolAttrs[p.name] = genPlayerAttr(p.route, effTier(p), p.special, p.name); });
+}
+/* 定向招募：玩家自选来路，本批全换该来路（普通权重） */
+function rollFactionDirected(fname) {
+  const f = FACTIONS.find(x => x.name === fname);
+  if (!f || factionExhausted(f)) return false;
+  S.faction = f;
+  S.person = null;
+  S.poolAttrs = {};
+  const unclaimed = f.people.filter(p => !S.claimed.has(f.name + '-' + p.name));
+  S.batch = drawBatch(unclaimed, false);
+  S.batch.forEach(p => { S.poolAttrs[p.name] = genPlayerAttr(p.route, effTier(p), p.special, p.name); });
+  return true;
+}
+function openDirectedPicker() {
+  const list = $('directed-list');
+  if (!list) return;
+  const avail = FACTIONS.filter(f => !factionExhausted(f));
+  list.innerHTML = avail.map(f => {
+    const rest = f.people.filter(p => !S.claimed.has(f.name + '-' + p.name));
+    const sN = rest.filter(p => p.tier === 'S').length, aN = rest.filter(p => p.tier === 'A').length;
+    return `<button class="pick-card" data-directed-faction="${f.name}"><div class="pick-name">${f.name}</div><div class="pick-desc">库中尚余 ${rest.length} 人${sN ? ` · S ${sN}` : ''}${aN ? ` · A ${aN}` : ''}</div></button>`;
+  }).join('');
+  list.querySelectorAll('[data-directed-faction]').forEach(b => b.onclick = () => {
+    if (rollFactionDirected(b.dataset.directedFaction)) {
+      directedReady = false;
+      $('directed-modal').classList.add('hidden');
+      saveGame('draft');
+      renderDraft();
+      adToast('定向招募——本批来自「' + S.faction.name + '」');
+    }
+  });
+  $('directed-modal').classList.remove('hidden');
 }
 /* v5.14 时期卡：effTier 取生效档位（巅峰用 peak.tier）；抽取/配额/保底仍按基础档，数值钳 40–99 */
 function effTier(p) { return (p.peak && S.peaked && S.peaked[p.name]) ? p.peak.tier : p.tier; }
@@ -3746,8 +3865,8 @@ function findPersonByName(name) {
   return null;
 }
 /* 按稀有度权重不放回抽取一批（每批 5 人）：S 权重最低、D 最高，顶配人物明显更稀有 */
-function drawBatch(people, boostS) {
-  const wOf = p => (TIER_WEIGHT[p.tier] || 1) * (boostS && p.tier === 'S' ? 4 : 1);
+function drawBatch(people, boostS, linkName) {
+  const wOf = p => (TIER_WEIGHT[p.tier] || 1) * (boostS && p.tier === 'S' ? 4 : 1) * (linkName && p.name === linkName ? 1.5 : 1);  /* v5.23 轻联动：搭档权重 ×1.5 */
   const pool = people.slice(), out = [];
   /* v5.10：星运保底——本批必含 1 名 S 与 1 名 A（池中尚有时），其余按权重抽 */
   if (boostS) {
@@ -3786,6 +3905,8 @@ function startDraft() {
   S.attrs = {}; S.lockedFrom = {}; S.claimed = new Set(); S.swapsLeft = 3; S.picks = 0;
   if (S.dailyMod && S.dailyMod.swapsDelta) S.swapsLeft = Math.max(0, S.swapsLeft + S.dailyMod.swapsDelta);  /* v5.19 词缀：一将难求/礼贤下士 */
   S.peaked = {};  /* v5.14：新局重置巅峰唤醒记录 */
+  S.baseAttrs = {}; S.bonds = {}; S.bondFx = 0; S.foeMarks = []; S.befriended = {}; S.chaseUsed = 0; S.bondChase = null; S.bondFreeRewind = 0; S.bondTempNext = false; S.bondNotes = []; S.bondLinkUsed = false; S.bondRewindAvail = false; S.__unveilBase = null;  /* v5.23 羁绊状态重置 */
+  directedReady = false;  /* 定向招募资格不跨局 */ try { const __wm = loadMerit(); if (__wm.welfareDirected) { __wm.welfareDirected = false; saveMerit(__wm); directedReady = true; } } catch (e) {} /* 群福利：待用定向资格在本局生效 */
   S.factionPicks = {}; S.deathVariant = null;  /* 阶段二：截教夺技计数（sectJie1 闸门）/ 死亡变体 */
   rollFaction();
   showScreen('draft');
@@ -3959,7 +4080,7 @@ function renderDraft() {
         return `<button class="person-card tier-${p.tier.toLowerCase()}${p.tier === 'S' || isPeak ? ' tier-top' : ''}" data-person="${p.name}">
           ${isPeak ? '<span class="peak-ribbon">巅峰</span>' : ''}
           ${avatarHTML(p.name)}
-          <div class="person-name">${p.name}<span class="grade">${attrGrade(povr)}</span></div>
+          <div class="person-name">${p.name}<span class="grade">${attrGrade(povr)}</span></div>${bondBadgeHTML(p.name)}
           <div class="person-meta">${p.route} · ${isPeak ? '🌟 巅峰·' + RARITY_LABEL[p.peak.tier] + ' ' + p.peak.label : (p.hiddenS ? '？级' : RARITY_LABEL[p.tier])} · 总评 ${povr} / 100 · 衰减 ×${decay.toFixed(2)}${FABAO_OF[p.name] ? ' · 兵器【' + FABAO_OF[p.name] + '】' : ''}</div>
           <div class="person-top">${top3}</div></button>`;
       }).join('')}</div>`;
@@ -4007,6 +4128,8 @@ function renderDraft() {
       } else if (lastAdMsg) { renderDraft(); adToast(lastAdMsg); }  /* 失败也重渲染：平台拒绝（UNAVAILABLE）后的锁定态立即显形 */
     };
   }
+  renderDraftBonds();  /* v5.23 羁绊进度行 */
+  renderBondBars();    /* v5.23 追羁绊/化敌按钮条 */
   const lockedKeys = Object.keys(S.attrs);
   $('draft-locked').innerHTML = lockedKeys.length
     ? '已锁定：' + lockedKeys.map(k => `${ATTR_NAMES[k]} ${S.attrs[k]}（${S.lockedFrom[k]}）`).join(' · ')
@@ -4016,18 +4139,254 @@ function renderDraft() {
 }
 function lockAttr(key) {
   const p = S.person, all = S.poolAttrs[p.name], decay = routeDecay(S.route, p.route);
-  S.attrs[key] = Math.max(30, Math.floor(all[key] * decay));
+  S.baseAttrs[key] = Math.max(30, Math.floor(all[key] * decay));  /* v5.23：先写锁定原值快照，S.attrs 一律由 recomputeBonds 从快照重算 */
   S.lockedFrom[key] = p.name;
   S.claimed.add(S.faction.name + '-' + p.name);
   collectPerson(p);  /* v5.8：人物图鉴点亮 + 累计夺技计数 */
   S.factionPicks = S.factionPicks || {}; S.factionPicks[S.faction.name] = (S.factionPicks[S.faction.name] || 0) + 1;  /* 阶段二：按货架阵营累加夺技计数 */
   if (p.tier === 'S') unlockAch('firstS');
+  const newly = recomputeBonds();  /* v5.23 羁绊结算（单一入口） */
   S.picks++;
+  if (newly.length) showGameToast('💞 羁绊触发：' + newly.map(B => `《${B.name}》`).join(' '));
   if (typeof Snd !== 'undefined') Snd.sfx('lock');
   S.person = null;
   if (S.picks >= 12) { finishDraft(); return; }
   rollFaction();
   renderDraft();
+}
+
+
+/* ---------- 羁绊系统（v5.23，波2镜像乱世母本）：配对/分档全在 BONDS 配置表，引擎只认 recomputeBonds 单入口 ----------
+   数值口径（定案 v2 三档制）：fill 结算 bonus = 2 + min(cap, max(0, ref − baseAttrs))；
+   FULL ref 90 / cap 15、LITE ref 86 / cap 10、BASE 只保底 +2；单对总加成硬顶 +22（保底＋补差合计，超出按补差等比缩）；
+   多员型补差合计另封顶（FULL 24 / LITE 14），集齐需求人数生效、多拿不叠加（按成员表序取前 need 人）；
+   全队型 +1 仅未满 90 的项、单局硬上限 +12；宿敌 −20% 单项封顶 −12，化敌为友＝精确回滚＋各 +4（每局 ≤2 次，本作仅 1 对）；
+   临时型另带骑手：下一场章节判定 +3；机制型另带：本局免费改命 1 次（映射本作既有「改命」回滚，见 btn-bond-rewind）。
+   铁律：羁绊永远只从 S.baseAttrs（锁定原值快照）重算，禁止在 S.attrs 上叠加；结算顺序＝宿敌→补强→全队型。 */
+const BOND_CLS = { FULL: { ref: 90, cap: 15 }, LITE: { ref: 86, cap: 10 }, BASE: { ref: -1, cap: 0 } };
+const BOND_PAIR_CAP = 22, BOND_TEAM_CAP = 12, BOND_CHASE_MAX = 2, BOND_FOE_RATE = 0.2, BOND_FOE_CAP = 12, BOND_BEFRIEND_PLUS = 4;
+const BONDS = [
+  { id: 'shuangkui',  a: '宋江',   b: '卢俊义', name: '双魁',           cls: 'BASE', type: 'fill',  desc: '及时雨与玉麒麟，梁山双魁。' },
+  { id: 'zhifa',      a: '吴用',   b: '公孙胜', name: '智法双辅',       cls: 'BASE', type: 'fill',  desc: '一智一法，梁山的两颗脑子。' },
+  { id: 'yezhulin',   a: '林冲',   b: '鲁智深', name: '野猪林相救',     cls: 'LITE', type: 'fill',  desc: '野猪林里，一根禅杖救回一条命。' },
+  { id: 'jieyi',      a: '杨雄',   b: '石秀',   name: '结义兄弟',       cls: 'FULL', type: 'fill',  desc: '病关索与拼命三郎，结义在蓟州。' },
+  { id: 'ruanshi',    members: ['阮小二', '阮小五', '阮小七'], need: 3, name: '阮氏三雄', cls: 'FULL', type: 'multi', desc: '石碣村三兄弟，水里来，浪里去。' },
+  { id: 'aijiaohu',   a: '王英',   b: '扈三娘', name: '矮脚虎与一丈青', cls: 'FULL', type: 'fill',  desc: '清风山下的一段孽缘，偏偏成了夫妻。' },
+  { id: 'zhupu',      a: '卢俊义', b: '燕青',   name: '主仆相知',       cls: 'BASE', type: 'fill',  desc: '主仆一场，肝胆相照。' },
+  { id: 'langli',     a: '张横',   b: '张顺',   name: '浪里兄弟',       cls: 'FULL', type: 'fill',  desc: '浔阳江上，船火儿与浪里白条。' },
+  { id: 'majun',      a: '关胜',   b: '呼延灼', name: '马军双雄',       cls: 'BASE', type: 'team',  desc: '大刀与双鞭，马军双雄。' },
+  { id: 'qingfeng',   a: '花荣',   b: '宋江',   name: '清风寨',         cls: 'BASE', type: 'temp', rider: 3, desc: '小李广的箭，护着及时雨。' },
+  { id: 'zhaoan',     a: '宋江',   b: '李逵',   name: '招安之争',       cls: 'BASE', type: 'foe', bfName: '替天行道', desc: '一个要招安，一个要扯诏。' },
+  { id: 'kuaihuolin', a: '武松',   b: '施恩',   name: '快活林',         cls: 'FULL', type: 'mech',  desc: '快活林里，醉打蒋门神的交情。' }
+];
+const BOND_TEMP_RATE = (BONDS.find(b => b.type === 'temp') || {}).rider || 3;
+function bondMembersOf(B) { return B.members ? B.members.slice() : [B.a, B.b]; }
+function bondNeedOf(B) { return B.need || bondMembersOf(B).length; }
+function bondSlotOf(name) { for (const k of ATTR_KEYS) if (S.lockedFrom[k] === name) return k; return null; }
+function bondLockedMembers(B) { return bondMembersOf(B).filter(n => bondSlotOf(n) !== null); }
+function recomputeBonds() {
+  const prev = S.bonds || {};
+  const newly = [];
+  S.attrs = {};
+  for (const k of ATTR_KEYS) if (k in (S.baseAttrs || {})) S.attrs[k] = S.baseAttrs[k];
+  S.bonds = {}; S.foeMarks = []; S.bondFx = 0;
+  const mark = B => { S.bonds[B.id] = true; if (!prev[B.id]) newly.push(B); };
+  /* 第一遍：宿敌（罚值记账 foeMarks=[槽,原值,罚后]；fill 在其上叠加；已化敌状态在重算中回放精确回滚＋各 +4） */
+  for (const B of BONDS) {
+    if (B.type !== 'foe') continue;
+    const locked = bondLockedMembers(B);
+    if (locked.length < bondNeedOf(B)) continue;
+    mark(B);
+    for (const n of locked) {
+      const slot = bondSlotOf(n), orig = S.baseAttrs[slot];
+      const pen = Math.min(BOND_FOE_CAP, Math.round(orig * BOND_FOE_RATE));
+      S.attrs[slot] = orig - pen;
+      S.foeMarks.push([slot, orig, orig - pen]);
+      S.bondFx -= pen;
+    }
+    if (S.befriended && S.befriended[B.id]) {
+      for (const m of S.foeMarks) {
+        if (!bondMembersOf(B).includes(S.lockedFrom[m[0]])) continue;
+        const back = (m[1] - m[2]) + BOND_BEFRIEND_PLUS;
+        S.attrs[m[0]] += back; S.bondFx += back;
+      }
+    }
+  }
+  /* 第二遍：fill / temp / mech / multi 补强 */
+  for (const B of BONDS) {
+    if (B.type === 'foe' || B.type === 'team') continue;
+    const all = bondLockedMembers(B);
+    if (all.length < bondNeedOf(B)) continue;
+    mark(B);
+    const locked = all.slice(0, bondNeedOf(B));  /* 多员多拿不叠加：按成员表序取前 need 人 */
+    const cls = BOND_CLS[B.cls] || BOND_CLS.BASE;
+    const ref = (typeof B.ref === 'number') ? B.ref : cls.ref;
+    const fills = locked.map(n => Math.min(cls.cap, Math.max(0, ref - S.baseAttrs[bondSlotOf(n)])));
+    const fillSum = fills.reduce((x, y) => x + y, 0);
+    let allowed = Math.min(fillSum, BOND_PAIR_CAP - 2 * locked.length);
+    if (B.type === 'multi') allowed = Math.min(allowed, B.cls === 'FULL' ? 24 : 14);
+    if (allowed < 0) allowed = 0;
+    const scale = fillSum > 0 ? allowed / fillSum : 0;
+    const gains = locked.map((n, i) => 2 + Math.floor(fills[i] * scale));
+    let over = gains.reduce((x, y) => x + y, 0) - Math.min(BOND_PAIR_CAP, 2 * locked.length + allowed);
+    if (over > 0) { const ord = gains.map((g, i) => i).sort((x, y) => gains[y] - gains[x]); for (const i of ord) { if (over <= 0) break; const cut = Math.min(over, gains[i] - 2); gains[i] -= cut; over -= cut; } }
+    locked.forEach((n, i) => {
+      S.attrs[bondSlotOf(n)] += gains[i]; S.bondFx += gains[i];
+    });
+    if (B.type === 'temp') S.bondTempNext = true;
+    if (B.type === 'mech') S.bondFreeRewind = Math.max(S.bondFreeRewind || 0, 1);
+  }
+  /* 第三遍：全队型（+1 仅未满 90 的项，计入单局硬上限 +12 按触发顺序截断） */
+  let teamGain = 0;
+  for (const B of BONDS) {
+    if (B.type !== 'team') continue;
+    if (bondLockedMembers(B).length < bondNeedOf(B)) continue;
+    mark(B);
+    for (const k of ATTR_KEYS) if (k in S.attrs && S.attrs[k] < 90 && teamGain < BOND_TEAM_CAP) { S.attrs[k]++; teamGain++; S.bondFx++; }
+  }
+  if (newly.length) {
+    try { const c = loadCollection(); let dirty = false; for (const B of newly) if (!c.bondsSeen[B.id]) { c.bondsSeen[B.id] = Date.now(); dirty = true; } if (dirty) saveCollection(c); } catch (e) {}
+    for (const B of newly) S.bondNotes.push(B.id);
+  }
+  return newly;
+}
+/* ---------- 羁绊进度图标：候选卡/已选人/已锁栏 ---------- */
+function bondBadgesFor(name) {
+  const out = [];
+  for (const B of BONDS) {
+    if (!bondMembersOf(B).includes(name)) continue;
+    if (S.bonds && S.bonds[B.id]) out.push({ txt: `💞 ${B.name} ✓`, on: true });
+    else out.push({ txt: `💞 ${B.name} ${bondLockedMembers(B).length}/${bondNeedOf(B)}`, on: false });
+  }
+  return out;
+}
+function bondBadgeHTML(name) {
+  const bs = bondBadgesFor(name);
+  if (!bs.length) return '';
+  return `<div class="bond-badges">${bs.map(x => `<span class="bond-badge${x.on ? ' on' : ''}">${x.txt}</span>`).join('')}</div>`;
+}
+function renderDraftBonds() {
+  const el = $('draft-bonds');
+  if (!el) return;
+  const parts = [];
+  const on = BONDS.filter(B => S.bonds && S.bonds[B.id]);
+  if (on.length) parts.push('💞 已触发：' + on.map(B => `《${B.name}》✓`).join(' '));
+  const prog = [];
+  for (const B of BONDS) {
+    if (S.bonds && S.bonds[B.id]) continue;
+    const locked = bondLockedMembers(B);
+    if (!locked.length) continue;
+    const missing = bondMembersOf(B).filter(n => bondSlotOf(n) === null);
+    prog.push(`《${B.name}》${locked.length}/${bondNeedOf(B)}（待：${missing.join('、')}）`);
+  }
+  if (prog.length) parts.push('💞 凑羁绊中：' + prog.join(' · '));
+  if (S.bondTempNext) parts.push('🌟 《清风寨》余势：下一场判定 +3');
+  if ((S.bondFreeRewind || 0) > 0) parts.push(`💞 《快活林》免费改命 ×${S.bondFreeRewind} 待用（章节判定失败后可用）`);
+  el.innerHTML = parts.join('<br>');
+}
+function bondUnveilLine() {
+  const on = BONDS.filter(B => S.bonds && S.bonds[B.id]);
+  if (!on.length) return '';
+  let s = `<br>💞 本局羁绊：${on.map(B => `《${B.name}》`).join(' ')}`;
+  if (on.some(B => B.type === 'foe' && !(S.befriended && S.befriended[B.id]))) s += '（宿敌未解，可看广告化敌为友）';
+  return s;
+}
+/* ---------- 广告追羁绊 / 化敌为友（发奖走既有 playRewardAd v5.22 口径，不另起一套） ---------- */
+function bondChaseTargets() {
+  if ((S.chaseUsed || 0) >= BOND_CHASE_MAX || S.picks >= 12) return [];
+  const out = [];
+  for (const B of BONDS) {
+    if (B.type === 'multi' || (S.bonds && S.bonds[B.id])) continue;
+    const ms = bondMembersOf(B);
+    const locked = ms.filter(n => bondSlotOf(n) !== null);
+    const missing = ms.filter(n => bondSlotOf(n) === null);
+    if (locked.length === 1 && missing.length === 1 && !out.includes(missing[0])) out.push(missing[0]);
+  }
+  return out;
+}
+function grantBondChase(name) {
+  S.chaseUsed = (S.chaseUsed || 0) + 1;
+  S.bondChase = name;
+  rollFaction();
+}
+function applyBondBefriend(id) {
+  S.befriended = S.befriended || {};
+  if (S.befriended[id]) return;
+  S.befriended[id] = true;
+  recomputeBonds();
+  if (S.picks >= 12) S.__unveilBase = Object.assign({}, S.attrs);  /* 揭幕后化敌：同步揭幕基底，settleUnveil 重算不回滚 */
+}
+function renderBondBars() {
+  renderBondBarInto($('bond-bar'), false);
+  renderBondBarInto($('bond-bar-unveil'), true);
+}
+function renderBondBarInto(el, unveil) {
+  if (!el) return;
+  const vis = !!window.__adVisible;
+  let h = '';
+  if (vis) {
+    if (!unveil && !S.person && S.picks < 12) {
+      for (const name of bondChaseTargets()) h += `<button class="btn-ghost" data-chase="${name}" ${adBusy || adRewardDone ? 'disabled' : ''}>${adBusy ? '📺 广告播放中…' : `📺 追羁绊：下批必出 ${name}（剩 ${BOND_CHASE_MAX - (S.chaseUsed || 0)} 次）`}</button>`;
+    }
+    for (const B of BONDS) {
+      if (B.type !== 'foe' || !(S.bonds && S.bonds[B.id]) || (S.befriended && S.befriended[B.id])) continue;
+      if (unveil || !S.person) h += `<button class="btn-ghost" data-befriend="${B.id}" ${adBusy || adRewardDone ? 'disabled' : ''}>${adBusy ? '📺 广告播放中…' : `📺 化敌为友《${B.bfName || '化敌为友'}》：解开《${B.name}》，两人各 +4`}</button>`;
+    }
+  }
+  el.innerHTML = h;
+  el.querySelectorAll('[data-chase]').forEach(b => b.onclick = () => onBondChase(b.dataset.chase));
+  el.querySelectorAll('[data-befriend]').forEach(b => b.onclick = () => onBondBefriend(b.dataset.befriend));
+}
+async function onBondChase(name) {
+  if (adBusy || adRewardDone || S.person || (S.chaseUsed || 0) >= BOND_CHASE_MAX) return;
+  if (await playRewardAd('chase', { partner: name })) {
+    grantBondChase(name);
+    renderDraft();
+    adToast('追羁绊——' + name + ' 已在本批候选之中');
+  } else if (lastAdMsg) { renderDraft(); adToast(lastAdMsg); }
+}
+async function onBondBefriend(id) {
+  if (adBusy || adRewardDone) return;
+  const B = BONDS.find(x => x.id === id);
+  if (!B) return;
+  if (await playRewardAd('befriend', { bond: id })) {
+    applyBondBefriend(id);
+    const msg = `化敌为友《${B.bfName || ''}》——宿敌尽解，两人各 +4`;
+    if (window.__curScreen === 'unveil') { settleUnveil(); showGameToast(msg); }
+    else { renderDraft(); adToast(msg); }
+  } else if (lastAdMsg) adToast(lastAdMsg);
+}
+/* ---------- 羁绊一览（配对＋效果定式文案＋三态收集；分档口径不对玩家外露） ---------- */
+function bondFxText(B) {
+  switch (B.type) {
+    case 'fill': return '联手补强：两人被夺的那一项都补上一截（弱项补得多），并各 +2。';
+    case 'multi': return `集齐任意 ${bondNeedOf(B)} 人触发：每人被夺的那一项补上一截（弱项补得多），并各 +2。`;
+    case 'temp': return '联手补强（两人被夺项各补一截并 +2）＋下一场章节判定成功率 +3。';
+    case 'mech': return '联手补强（两人被夺项各补一截并 +2）＋本局一次免费改命（章节判定失败后回到抉择之前，不用看广告）。';
+    case 'foe': return '宿敌：两人被夺的那一项各 −20%（最多 −12）；看广告「化敌为友《' + (B.bfName || '化敌为友') + '》」可精确解开惩罚，两人再各 +4。';
+    case 'team': return '全队每一项 +1（仅未满 90 的项，单局合计至多 +12）。';
+    default: return '';
+  }
+}
+function openBonds() {
+  const c = loadCollection();
+  const seen = c.bondsSeen || {};
+  $('bonds-list').innerHTML = BONDS.map(B => {
+    const pair = bondMembersOf(B).join(' ＋ ') + (B.type === 'multi' ? `（集齐 ${bondNeedOf(B)} 人）` : '');
+    let st, stc;
+    if (S.bonds && S.bonds[B.id]) { st = '本局已触发'; stc = '#2e7d4f'; }
+    else if (seen[B.id]) { st = '曾经触发'; stc = '#8a6d1f'; }
+    else { st = '未触发'; stc = '#a08c66'; }
+    return `<div class="bond-card"><b>《${B.name}》</b><span style="float:right;font-size:12px;font-weight:700;color:${stc}">${st}</span><div style="font-size:13px;color:#b3352c;font-weight:700;margin:3px 0">${pair}</div><div style="font-size:13px;line-height:1.7;color:#4a3a26">${B.desc}</div><div style="font-size:13px;line-height:1.7;color:#4a3a26">${bondFxText(B)}</div></div>`;
+  }).join('');
+  $('bonds-modal').classList.remove('hidden');
+  updateBondsBtn();
+}
+function updateBondsBtn() {
+  const c = loadCollection();
+  const txt = `（已收集 ${Object.keys(c.bondsSeen || {}).length} / ${BONDS.length}）`;
+  const el = $('bonds-seen-count'); if (el) el.textContent = txt;
+  const el2 = $('bonds-seen-count2'); if (el2) el2.textContent = txt;
 }
 
 /* ---------- 揭幕结算（任务书 §1 顺序：锁定 → 出身修正 → 钳上限 99 → 重算德不配位） ---------- */
@@ -4053,6 +4412,14 @@ function roleRank(ovr) {
   return '无名小卒';
 }
 function finishDraft() {
+  recomputeBonds();  /* v5.23：揭幕冻结——羁绊以 baseAttrs 快照做最终结算 */
+  S.__unveilBase = Object.assign({}, S.attrs);
+  settleUnveil();
+  showScreen('unveil');
+}
+/* 揭幕结算（可重入）：从 __unveilBase（羁绊结算后、出身修正前）重算派生值与揭幕页，供揭幕页化敌为友后刷新 */
+function settleUnveil() {
+  S.attrs = Object.assign({}, S.__unveilBase || S.attrs);
   for (const k in S.origin.initFix) S.attrs[k] += S.origin.initFix[k];
   for (const k of ATTR_KEYS) S.attrs[k] = Math.min(99, S.attrs[k]);
   for (const k of SEC_KEYS) S.sec[k] = 0;
@@ -4076,13 +4443,13 @@ function finishDraft() {
     `路线 ${S.route} ｜ 总评 <b>${S.ovr} / 100</b><span class="grade">${attrGrade(S.ovr)}</span> ｜ 德不配位 <b>${S.deBuPei}</b> 项<br>` +
     `角色定位：${roleRank(S.ovr)} ｜ 初始人马 ${S.troops} ｜ 出身：${S.origin.name}` +
     (S.scheme ? `<br>开局方略：${schemeName(S.scheme)}` : '') +
-    (S.dailyMod ? `<br>今日词缀：${S.dailyMod.name} —— ${S.dailyMod.desc}` : '');
+    (S.dailyMod ? `<br>今日词缀：${S.dailyMod.name} —— ${S.dailyMod.desc}` : '') + bondUnveilLine();
   $('unveil-attrs').innerHTML = ATTR_KEYS.map(k => {
     const th = (S.attrs.physique + S.attrs.nerve) / 2 + 30;
     return `<div class="attr-cell"><div class="a-name">${ATTR_NAMES[k]}${S.attrs[k] > th ? ' ⚠️' : ''}</div><div class="a-val">${S.attrs[k]}</div><div class="a-grade">${attrGrade(S.attrs[k])}</div></div>`;
   }).join('');
   if (S.deBuPei === 0) unlockAch('noDeBuPei');  /* v5.8 成就：德才兼备 */
-  showScreen('unveil');
+  renderBondBars();  /* v5.23：揭幕页化敌为友按钮 */
 }
 
 /* ---------- 掷骰（任务书 §4.3） ---------- */
@@ -4227,6 +4594,7 @@ function startChapters() {
   S.gamble = false; S.selfStreak = 0;
   S.bios = []; S.eventsUsed = []; S.eventsFired = 0; S.finalChoice = null; S.deadPending = false;
   S.jinnang = false; S.rewindLeft = 2;
+  S.lastSettle = null; S.rewindSnap = null; S.rewindAvail = false; S.evDoneCh = null;
   if (S.scheme === 'qimou') S.jinnang = true;  /* v5.19 方略·奇谋：自带锦囊 */
   if (S.dailyMod && S.dailyMod.jinnang) S.jinnang = true;  /* v5.19 词缀·星运所归：自带锦囊 */
   S.fate = pick(FATES);  /* v5.6：本局星运开局抽定，整局生效 */
@@ -4292,6 +4660,7 @@ function curChapter() { return curChapterOf(S.ch); }
 function enterChapter(n) {
   S.ch = n;
   S.gamble = false;
+  S.lastSettle = null;  /* 判定落盘：新章首清除上章结算记录（随本章章首存档一并覆写） */
   const ch = curChapterOf(n);
   fabaoRateBonus = fabaoBonusFor(ch);  /* 阶段二：本章克制加成结算 */
   let note = '';
@@ -4396,6 +4765,7 @@ function refreshChapterUI() {
 }
 function chooseChapterOption(opt) {
   const ch = curChapter();
+  const optIdx = ch.options.indexOf(opt);
   if (opt.check) {
     rewindSnapshot = {
       health: S.health, troops: S.troops, sec: Object.assign({}, S.sec), merit: S.merit,
@@ -4407,17 +4777,20 @@ function chooseChapterOption(opt) {
   let branch, head = '', extraNote = '';
   const gambling = S.gamble && !!opt.check;
   let success = null;
+  let roll = null, rate = null;
   if (opt.check) {
     const baseRate = successRate(opt.check);
-    let rate = gambling ? gambleRate(baseRate) : baseRate;
+    rate = gambling ? gambleRate(baseRate) : baseRate;
     let jinnangUsed = false;
     if (S.jinnang) { rate = clamp(rate + 12, 10, 95); jinnangUsed = true; S.jinnang = false; }
-    const roll = randInt(1, 100);
+    let bondTempUsed = false;
+    if (S.bondTempNext) { rate = clamp(rate + BOND_TEMP_RATE, 10, 95); bondTempUsed = true; S.bondTempNext = false; }  /* v5.23 《清风寨》骑手：下一场判定 +3（与锦囊同口径，仅章节判定，事件判定不吃一次性加成——沿母本规则） */
+    roll = randInt(1, 100);
     if (typeof Snd !== 'undefined') Snd.sfx('dice');
     success = roll <= rate;
     const raw = success ? opt.win : opt.lose;
     branch = gambling ? Object.assign({}, raw, { effects: scaleEffects(raw.effects, 2) }) : raw;
-    head = `掷骰 ${roll}（成功率 ${rate}%${gambling ? ' · 赌一把' : ''}${jinnangUsed ? ' · 锦囊护体' : ''}）——${success ? '成了' : '败了'}`;
+    head = `掷骰 ${roll}（成功率 ${rate}%${gambling ? ' · 赌一把' : ''}${jinnangUsed ? ' · 锦囊护体' : ''}${bondTempUsed ? ' · 羁绊余势' : ''}）——${success ? '成了' : '败了'}`;
     if (gambling && success) unlockAch('gambleWin');  /* v5.8 成就：赌徒本色 */
     if (opt.kind === '亲为') {
       if (success && S.attrs[opt.check] >= 85) { S.scenes++; head += ' · 名场面！'; }
@@ -4450,33 +4823,61 @@ function chooseChapterOption(opt) {
   if (bio) S.bios.push(bio);
   if (S.health <= 0) S.deadPending = true;
   if (typeof Snd !== 'undefined' && success !== null) setTimeout(() => Snd.sfx(success ? 'win' : 'lose'), 300);
+  rewindAvailable = success === false && !!rewindSnapshot && S.rewindLeft > 0 && rewindChapterUsed !== S.ch;
+  bondRewindAvail = success === false && !!rewindSnapshot && (S.bondFreeRewind || 0) > 0 && rewindChapterUsed !== S.ch;  /* v5.23 羁绊免费改命可用标记（不看广告改命余量、不用看广告） */
+  S.bondRewindAvail = bondRewindAvail;
+  /* 判定落盘：效果只结算这一次，随即把结算记录＋改命快照写进存档再渲染——退出/强杀后恢复只重建结果视图，绝不二次结算 */
+  S.rewindSnap = (opt.check && rewindSnapshot) ? JSON.parse(JSON.stringify(rewindSnapshot)) : null;
+  S.rewindAvail = rewindAvailable;
+  S.lastSettle = {
+    ch: S.ch, kind: 'chapter', opt: optIdx,
+    roll, rate, ok: success, tier: branch.tier || null,
+    gainText: effectSummary(branch.effects), note: extraNote,
+    dead: !!S.deadPending, evId: null, head, bio
+  };
+  saveGame('chapter-settle');
+  renderSettle(true);
+}
+/* 章节判定结果视图单一入口：实时结算与存档恢复共用，只读 S.lastSettle 重建 DOM，不触碰任何数值 */
+function renderSettle(animate) {
+  const ls = S.lastSettle;
+  if (!ls || ls.kind !== 'chapter') return;
+  const ch = curChapter();
   $('ch-options').classList.add('hidden');
   const res = $('ch-result');
   res.classList.remove('hidden');
   /* v2：战报分段揭示——先结果、再得失、最后列传句，继续按钮最后出现 */
   $('ch-result-text').innerHTML =
-    `<div class="r-head reveal" id="rv-1">${head}${branch.tier && !ch.noMerit ? ` · 功业档：${branch.tier}` : ''}</div>` +
-    `<div class="r-after reveal" id="rv-2">本章得失：${effectSummary(branch.effects)}${extraNote ? '｜' + extraNote : ''}｜当前 气血 ${S.health} · 人马 ${S.troops} · 星运 ${S.sec.fame} · 功业 ${S.merit} · 狂言 ${S.taunts}${S.flags.length ? ' · 标记：' + S.flags.join(' / ') : ''}</div>` +
-    (bio ? `<div class="r-bio reveal" id="rv-3">列传添一句：「${bio}」</div>` : '');
-  rewindAvailable = success === false && !!rewindSnapshot && S.rewindLeft > 0 && rewindChapterUsed !== S.ch;
+    `<div class="r-head reveal" id="rv-1">${ls.head}${ls.tier && !ch.noMerit ? ` · 功业档：${ls.tier}` : ''}</div>` +
+    `<div class="r-after reveal" id="rv-2">本章得失：${ls.gainText}${ls.note ? '｜' + ls.note : ''}｜当前 气血 ${S.health} · 人马 ${S.troops} · 星运 ${S.sec.fame} · 功业 ${S.merit} · 狂言 ${S.taunts}${S.flags.length ? ' · 标记：' + S.flags.join(' / ') : ''}</div>` +
+    (ls.bio ? `<div class="r-bio reveal" id="rv-3">列传添一句：「${ls.bio}」</div>` : '');
   syncAllAdBtns();
   const nextBtn = $('btn-chapter-next');
   nextBtn.classList.add('reveal');
-  nextBtn.textContent = S.deadPending ? '查看结局 →' : '继续 →';
+  nextBtn.textContent = ls.dead ? '查看结局 →' : '继续 →';
   nextBtn.onclick = afterChapter;
-  requestAnimationFrame(() => { const e = $('rv-1'); if (e) e.classList.add('on'); });
-  setTimeout(() => { const e = $('rv-2'); if (e) e.classList.add('on'); }, 550);
-  setTimeout(() => { const e = $('rv-3'); if (e) e.classList.add('on'); nextBtn.classList.add('on'); }, 1100);
+  if (animate) {
+    requestAnimationFrame(() => { const e = $('rv-1'); if (e) e.classList.add('on'); });
+    setTimeout(() => { const e = $('rv-2'); if (e) e.classList.add('on'); }, 550);
+    setTimeout(() => { const e = $('rv-3'); if (e) e.classList.add('on'); nextBtn.classList.add('on'); }, 1100);
+  } else {
+    ['rv-1', 'rv-2', 'rv-3'].forEach(id => { const e = $(id); if (e) e.classList.add('on'); });
+    nextBtn.classList.add('on');
+  }
   refreshChapterUI();
 }
 /* 章末：先判事件（触发则停在弹窗，关窗后走 proceedAfterChapter，不重复判定），再判推进 */
 function afterChapter() {
-  rewindAvailable = false; rewindSnapshot = null; syncAllAdBtns();
-  if (S.deadPending) { finishEnding('disease'); return; }
-  if (EVENT_AFTER_CHAPTERS.includes(S.ch) && S.eventsFired < MAX_EVENTS_GAME) {
+  rewindAvailable = false; rewindSnapshot = null;
+  S.rewindSnap = null; S.rewindAvail = false;
+  bondRewindAvail = false; S.bondRewindAvail = false;  /* v5.23 */
+  syncAllAdBtns();
+  if (S.deadPending) { S.lastSettle = null; finishEnding('disease'); return; }
+  if (S.evDoneCh !== S.ch && EVENT_AFTER_CHAPTERS.includes(S.ch) && S.eventsFired < MAX_EVENTS_GAME) {
     const ev = drawEvent();
-    if (ev) { openEvent(ev); return; }
+    if (ev) { openEvent(ev); return; }  /* 事件未结算前不清除本章 lastSettle：强杀恢复仍回本章结果页，事件结算时再覆写为事件记录 */
   }
+  S.lastSettle = null;  /* 推进前清判定记录防下一章误认（enterChapter 章首落盘随即覆写存档） */
   proceedAfterChapter();
 }
 /* 决策修复轮：阵殁门过渡——机制保留（第19章后亲征受挫达标直达 diedWar），但先出过渡文案，玩家点确认才进结局页，不再无提示跳变 */
@@ -4529,39 +4930,73 @@ function openEvent(ev) {
   $('event-modal').classList.remove('hidden');
 }
 function chooseEventOption(opt) {
+  const ev = curEvent;
+  const optIdx = ev ? ev.options.indexOf(opt) : -1;
   if (opt.taunt) S.taunts++;
   let result = '';
+  let roll = null, rate = null, ok = null, evHead = '', evBody = '', evNote = '';
   if (opt.check) {
-    const rate = successRate(opt.check);
-    const roll = randInt(1, 100);
+    rate = successRate(opt.check);
+    roll = randInt(1, 100);
     const success = roll <= rate;
+    ok = success;
     const branch = success ? opt.win : opt.lose;
     if (opt.scene && success && S.attrs[opt.check] >= 85) S.scenes++;
     applyEffects(branch.effects);
     if (typeof Snd !== 'undefined') Snd.sfx(success ? 'win' : 'lose');
-    result = `掷骰 ${roll}（成功率 ${rate}%）——${success ? '成了' : '败了'}\n${branch.result}`;
+    evHead = `掷骰 ${roll}（成功率 ${rate}%）——${success ? '成了' : '败了'}`;
+    evBody = branch.result;
+    result = `${evHead}\n${branch.result}`;
     if (!success) {
       applyEffects({ health:-3, troops:-50 });
-      result += '\n判定失败另扣：气血-3 · 人马-50';
+      evNote = '判定失败另扣：气血-3 · 人马-50';
+      result += '\n' + evNote;
     }
   } else {
     applyEffects(opt.effects);
+    evBody = opt.result;
     result = opt.result;
   }
   if (S.health <= 0) S.deadPending = true;
+  /* 事件判定落盘：效果只结算这一次，结算记录随档走、恢复重建事件结果态；evDoneCh 标记本章事件已结算，防重抽 */
+  S.evDoneCh = S.ch;
+  S.lastSettle = {
+    ch: S.ch, kind: 'event', opt: optIdx,
+    roll, rate, ok, tier: null,
+    gainText: evBody, note: evNote,
+    dead: !!S.deadPending, evId: ev ? ev.id : null, head: evHead, bio: ''
+  };
+  saveGame('event-settle');
+  renderEventSettle();
+  refreshChapterUI();
+}
+/* 事件结果态单一入口：实时结算与存档恢复共用，只读 S.lastSettle 重建弹窗，不触碰任何数值 */
+function renderEventSettle() {
+  const ls = S.lastSettle;
+  if (!ls || ls.kind !== 'event') return;
+  const ev = EVENTS.find(e => e.id === ls.evId);
+  if (!ev) return;
+  curEvent = ev;
+  fabaoRateBonus = 0;  /* 与 openEvent 同口径：兵器克制不作用于随机事件 */
+  const evArt = $('ev-art');
+  setAtlasArt(evArt, (typeof EV_ART !== 'undefined') ? EV_ART[ev.id] : null);
+  $('ev-title').textContent = ev.title;
+  $('ev-story').textContent = ev.story;
+  $('ev-focus').textContent = ev.focus || '';
   $('ev-options').classList.add('hidden');
   const res = $('ev-result');
   res.classList.remove('hidden');
-  res.textContent = result + `\n（气血 ${S.health} · 人马 ${S.troops} · 星运 ${S.sec.fame}）`;
+  res.textContent = (ls.head ? ls.head + '\n' : '') + (ls.gainText || '') + (ls.note ? '\n' + ls.note : '') + `\n（气血 ${S.health} · 人马 ${S.troops} · 星运 ${S.sec.fame}）`;
   const closeBtn = $('btn-ev-close');
   closeBtn.classList.remove('hidden');
-  closeBtn.textContent = S.deadPending ? '查看结局 →' : '继续 →';
-  closeBtn.onclick = () => {
-    $('event-modal').classList.add('hidden');
-    if (S.deadPending) { finishEnding('disease'); return; }
-    proceedAfterChapter();
-  };
-  refreshChapterUI();
+  closeBtn.textContent = ls.dead ? '查看结局 →' : '继续 →';
+  closeBtn.onclick = closeEventSettle;
+  $('event-modal').classList.remove('hidden');
+}
+function closeEventSettle() {
+  $('event-modal').classList.add('hidden');
+  if (S.deadPending) { finishEnding('disease'); return; }
+  proceedAfterChapter();
 }
 
 /* ---------- 结局（任务书 §7，顺序 1→2→3→6→4→5→7） ---------- */
@@ -4904,23 +5339,24 @@ function renderPoster() {
 })();
 
 /* 资源预热：提前解码前三章插图，降低首次进入章节时的绘制延迟 */
-try { const __im0 = new Image(); __im0.src = ART_ATLAS.chA.src; } catch (e) {}  /* 图集化：先解码章节图集 A */
+/* 性能修复 2026-11-06：图集预热整体推迟到首屏交互窗之后（原 chA 在脚本解析期立即解码、其余 1.2s 起每 350ms 一张，
+   与玩家首次点击抢主线程，是操作响应超标的共犯之一）。改为 2.5s 起、间隔 900ms 逐张空闲解码，失败静默不变。 */
 /* v5.11：其余插图空闲逐张解码（每 350ms 一张），失败静默 */
 try {
-  const __preheatQueue = [ART_ATLAS.chB.src, ART_ATLAS.ev.src];  /* 图集化：预热其余两张图集 */
+  const __preheatQueue = [ART_ATLAS.chA.src, ART_ATLAS.chB.src, ART_ATLAS.ev.src];  /* 图集化：三张图集统一延迟预热 */
   const __preheatStep = () => {
     const u = __preheatQueue.shift();
     if (u) {
       const im = new Image();
       im.src = u;
       if (im.decode) im.decode().catch(() => {});
-      setTimeout(__preheatStep, 350);
+      setTimeout(__preheatStep, 900);
     } else {
       const bgEl = document.getElementById('poster-bg-img');
       if (bgEl && bgEl.decode) bgEl.decode().catch(() => {});
     }
   };
-  setTimeout(__preheatStep, 1200);
+  setTimeout(__preheatStep, 2500);
 } catch (e) {}
 
 /* ---------- v5.15 加载页（最短 0.8s、2.6s 兜底、点击跳过） ---------- */
@@ -4961,8 +5397,9 @@ function loadDaily() {
 function saveDaily(d) { try { localStorage.setItem(DAILY_KEY, JSON.stringify(d)); } catch (e) {} }
 
 /* 北京时间日期键（挑战按北京时间零点切换，GPT/DS 双函共识） */
+const __bjFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }); /* 性能修复 2026-11-06：Intl 格式化器构造昂贵，全局只建一次复用（原每次调用新建，加载采样中为最热命名函数） */
 function beijingDateKey(offsetDays) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const parts = __bjFmt.formatToParts(new Date());
   const g = t => +parts.find(p => p.type === t).value;
   return new Date(Date.UTC(g('year'), g('month') - 1, g('day') + (offsetDays || 0))).toISOString().slice(0, 10);
 }
@@ -5226,6 +5663,10 @@ try { renderDailyCard(); } catch (e) {}  /* v5.19：首屏即渲染今日挑战�
 
 /* ---------- v5.15 更新公告 ---------- */
 const NOTICES = [
+  { v: 'v1.5', d: '11月8日', t: '羁绊系统', items: ['💞 羁绊系统上线：12 对好汉羁绊——双魁、阮氏三雄、马军双雄……同局夺齐配对即触发联手补强（弱项补得多），选人时卡面有进度角标，首页「羁绊一览」可查全部配对', '📺 新增广告玩法：已锁一员时可「追羁绊」让搭档下一批必出；《招安之争》触发后可看广告「化敌为友·替天行道」解开宿敌', '《清风寨》触发后下一场判定 +3；《快活林》触发后本局可免费改命一次'] },
+  { v: 'v1.4', d: '11月6日', t: '群福利＋性能优化', items: ['🎁 群福利开放：首页或交流群弹窗输入群内福利码，领名望 ×300＋定向招募资格 ×1（每人限领一次）', '运行流畅度优化：图集加载与图鉴渲染提速，操作响应更快', '存档加固：新增「云端短码」——整档登记云端换 8 位短码，换设备输码取回，长码继续作离线兜底'] },   { v: 'v1.3', d: '11月5日', t: '稳定性修复', items: ['章节与事件的判定结果现已即时保存，退出重进将直接回到结果页，不再重复结算；改命进度同步落盘更可靠。'] },
+  { v: 'v1.2', d: '11月5日', t: '定向招募', items: ['夺技页广告位升级：原「看广告换一批」改为「定向招募」——看广告后自选一个来路，本批全部换成该来路的人物', '看完广告暂时不想换也没事：资格会存着，之后在夺技页点「定向招募已就绪」随时选来路'] },
+  { v: 'v1.1', d: '11月4日', t: '拼将交流群开群', items: ['首页新增「加入拼将交流群」：扫码进群，乱世、封神、水浒三作玩家都在这里，聊阵容、晒战绩、报 bug', '图鉴加载提速，头像改为按需加载，进图不再卡顿', '修复战绩榜页签在窄屏手机上溢出屏幕的问题'] },
   { v: 'v1.0', d: '11月5日', t: '水浒拼将 · 开山', items: [
     '首发上线：从一百单八将手里夺取十二项本事，拼出你自己的梁山班底，走完二十回——聚义自立、招安入世还是远走海外，梁山的命运你说了算',
     '义气与功名双值全程可见：你的每个选择都在推着这两条线走，终局分野全看这一路怎么选',
@@ -5253,7 +5694,64 @@ $('btn-notice').onclick = openNotices;
 $('btn-notice-all').onclick = openNotices;
 $('btn-notice-close').onclick = () => $('notice-modal').classList.add('hidden');
 $('notice-modal').addEventListener('click', e => { if (e.target === $('notice-modal')) $('notice-modal').classList.add('hidden'); });
+$('btn-group').onclick = () => $('group-modal').classList.remove('hidden');
+$('btn-group-close').onclick = () => $('group-modal').classList.add('hidden');
+$('btn-bonds').onclick = () => openBonds();
+$('btn-bonds-close').onclick = () => $('bonds-modal').classList.add('hidden');
+$('bonds-modal').addEventListener('click', e => { if (e.target === $('bonds-modal')) $('bonds-modal').classList.add('hidden'); });
+$('btn-directed-cancel').onclick = () => $('directed-modal').classList.add('hidden');
+$('directed-modal').addEventListener('click', e => { if (e.target === $('directed-modal')) $('directed-modal').classList.add('hidden'); });
+$('group-modal').addEventListener('click', e => { if (e.target === $('group-modal')) $('group-modal').classList.add('hidden'); });
 renderNoticeBoard();
+  /* ---------- 群福利（四作同款，总台 2026-11-06 定版口径）：服务端核销一人一次，实发以回执为准 ---------- */
+  const WELFARE_GAME = 'sh', WELFARE_LABEL = '名望 ×300', WELFARE_AMOUNT = 300;
+  function wfBlockHtml() {
+    const m = loadMerit();
+    if (m.welfareClaimed) return '<div class="card" style="margin-top:10px;"><b>🎁 群福利</b><p class="hint" style="margin:4px 0;">✅ 你已经领过这份福利啦</p></div>';
+    return '<div class="card" style="margin-top:10px;"><b>🎁 群福利</b>'
+      + '<p class="hint" style="margin:4px 0;">进群福利：<b>' + WELFARE_LABEL + '</b>＋<b>定向招募资格 ×1</b>（每人限领一次，定向资格下一局开局生效）。福利码将在群内发布，开放后在此输入领取。</p>'
+      + '<div style="display:flex;gap:8px;"><input class="wf-code" placeholder="输入福利码" style="flex:1;text-transform:uppercase;"><button class="btn-primary wf-btn">领取</button></div>'
+      + '<p class="hint wf-msg" style="color:#b3402a;margin:4px 0;"></p></div>';
+  }
+  function renderWelfare() { document.querySelectorAll('.wf-slot').forEach(el => { el.innerHTML = wfBlockHtml(); }); wireWelfare(); }
+  function wireWelfare() {
+    document.querySelectorAll('.wf-btn').forEach(btn => { btn.onclick = async () => {
+      const card = btn.closest('.card'); if (!card) return;
+      const inp = card.querySelector('.wf-code'), msg = card.querySelector('.wf-msg');
+      const code = ((inp && inp.value) || '').trim().toUpperCase();
+      if (!code) { if (msg) msg.textContent = '先填福利码（在交流群里发布）'; return; }
+      btn.disabled = true;
+      try {
+        let grant;
+        if (typeof lbAvailable === 'function' && lbAvailable()) {
+          grant = await lbRequest('/welfare/redeem', { game: WELFARE_GAME, code });
+        } else {
+          /* 网页预览无平台通道：本地模拟核销（每码一次），虎扑正式环境走服务端 */
+          const mm = loadMerit(); if (mm.welfareClaimed) throw new Error('你已经领过这份福利啦');
+          grant = { currency: 'merit', amount: WELFARE_AMOUNT, label: WELFARE_LABEL, directed: true, mock: true };
+        }
+        const amount = Number(grant.amount) || 0;
+        if (amount) creditMerit(amount);
+        const m = loadMerit(); m.welfareClaimed = true; if (grant.directed) m.welfareDirected = true; saveMerit(m);
+        showGameToast('🎁 群福利到账：' + (grant.label || WELFARE_LABEL) + (grant.directed ? '＋定向招募资格 ×1（下局生效）' : ''));
+        renderWelfare(); if (typeof renderDailyCard === 'function') renderDailyCard();
+      } catch (e) {
+        const text = (e && e.message) || '领取失败，稍后再试';
+        if (text.indexOf('已经领过') >= 0) { const m = loadMerit(); m.welfareClaimed = true; saveMerit(m); renderWelfare(); }
+        if (msg) msg.textContent = text;
+        btn.disabled = false;
+      }
+    }; });
+  }
+  try {
+    const __wfOpen = $('btn-group').onclick;
+    $('btn-group').onclick = () => { renderWelfare(); if (__wfOpen) __wfOpen(); else $('group-modal').classList.remove('hidden'); };
+    document.querySelectorAll('.wf-close').forEach(b => { b.onclick = () => $('welfare-modal').classList.add('hidden'); });
+    $('welfare-modal').addEventListener('click', e => { if (e.target === $('welfare-modal')) $('welfare-modal').classList.add('hidden'); });
+    document.querySelectorAll('.wf-off').forEach(c => { c.addEventListener('change', () => { const m = loadMerit(); m.welfareNoticeOff = !!c.checked; saveMerit(m); }); });
+    /* TR-023（2026-11-06 审核意见「群福利公告让用户点开再看，不要进去就弹窗」）：福利公告自动弹窗下线；领取保留在交流群弹窗内点击进行（.wf-slot 同表单） */
+  } catch (e) {}
+
 
 /* ---------- v5.15 存档页 ---------- */
 let __dropArm = false;
@@ -5275,7 +5773,66 @@ function renderArchive() {
 }
 $('btn-archive').onclick = () => { renderArchive(); showScreen('archive'); };
 $('btn-archive-back').onclick = () => showScreen('home');
-$('btn-code-export').onclick = () => { const ta = $('save-code'); ta.value = exportSaveCode(); ta.select(); showGameToast('存档码已生成，复制保存好'); };  /* v5.19 */
+$('btn-code-export').onclick = () => { const ta = $('save-code'); ta.value = exportSaveCode(); ta.select(); showGameToast('存档码已生成，复制保存好'); };
+  /* ---------- 云端短码（存档加固批）：服务端登记制，取回应用步骤与长码导入 importSaveCode 同款 ---------- */
+  const SC_GAME = 'sh';
+  function buildSavePayload() { const keys = {}; codeKeys().forEach(k => { const v = localStorage.getItem(k); if (v !== null) keys[k] = v; }); return JSON.stringify({ v: 1, app: 'shuihu', ts: Date.now(), keys }); }
+  function applySaveObj(obj) {
+    codeKeys().forEach(k => { if (typeof obj.keys[k] === 'string') { try { localStorage.setItem(k, obj.keys[k]); } catch (e) {} } });
+    try { cloudPush(RECORDS_KEY, localStorage.getItem(RECORDS_KEY) || '[]'); cloudPush(COLLECTION_KEY, localStorage.getItem(COLLECTION_KEY) || '{}'); if (typeof obj.keys[MERIT_KEY] === 'string') cloudPush(MERIT_KEY, obj.keys[MERIT_KEY]); if (typeof obj.keys[DAILY_KEY] === 'string') cloudPush(DAILY_KEY, obj.keys[DAILY_KEY]); } catch (e) {}
+    try { sessionStorage.setItem('ls_imported', '1'); } catch (e) {}
+    location.reload();
+  }
+  let __scArm = false, __scObj = null;
+  try {
+    $('btn-sc-issue').onclick = async () => {
+      const msg = $('sc-msg'); msg.textContent = '';
+      const btn = $('btn-sc-issue'); btn.disabled = true;
+      try {
+        const payload = buildSavePayload();
+        let code;
+        if (typeof lbAvailable === 'function' && lbAvailable()) {
+          const r = await lbRequest('/savecode/issue', { game: SC_GAME, payload });
+          code = r && r.shortCode;
+        } else {
+          /* 网页预览无平台通道：本地模拟登记（同设备自测），虎扑正式环境走服务端 */
+          code = Array.from({ length: 8 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+          try { localStorage.setItem('sc_mock_' + code, payload); } catch (e) {}
+        }
+        if (!code) throw new Error('短码生成失败');
+        $('sc-code').textContent = code;
+        $('sc-out').classList.remove('hidden');
+        showGameToast('☁️ 短码已生成，记好它');
+      } catch (e) { msg.textContent = (e && e.message) || '短码暂时生成不了，稍后再试'; }
+      btn.disabled = false;
+    };
+    $('btn-sc-fetch').onclick = async () => {
+      const msg = $('sc-msg'); msg.textContent = '';
+      const btn = $('btn-sc-fetch');
+      if (__scArm && __scObj) { __scArm = false; applySaveObj(__scObj); return; }
+      const code = String(($('sc-in').value || '')).trim().toUpperCase();
+      if (!/^[A-Z0-9]{8}$/.test(code)) { msg.textContent = '短码是 8 位字母数字'; return; }
+      btn.disabled = true;
+      try {
+        let payload = null;
+        if (typeof lbAvailable === 'function' && lbAvailable()) {
+          const r = await lbRequest('/savecode/fetch', { game: SC_GAME, code });
+          payload = r && r.payload;
+        } else {
+          try { payload = localStorage.getItem('sc_mock_' + code); } catch (e) {}
+          if (!payload) throw new Error('短码不对或不是这个游戏的码');
+        }
+        let obj = null;
+        try { obj = JSON.parse(payload); } catch (e) {}
+        if (!obj || obj.v !== 1 || !obj.keys) { msg.textContent = '短码对应的存档损坏，取回失败'; btn.disabled = false; return; }
+        __scObj = obj; __scArm = true;
+        btn.textContent = '再点一次，确认取回（将覆盖当前全部进度）';
+        setTimeout(() => { __scArm = false; __scObj = null; btn.textContent = '取回存档'; }, 6000);
+      } catch (e) { msg.textContent = (e && e.message) || '短码暂时取不了，稍后再试'; }
+      btn.disabled = false;
+    };
+  } catch (e) {}
+  /* v5.19 */
 $('btn-code-import').onclick = importSaveCode;  /* v5.19 */
 $('btn-archive-continue').onclick = () => restoreGame();
 $('btn-archive-records').onclick = () => openRecords();
@@ -5289,9 +5846,9 @@ $('btn-archive-drop').onclick = () => {
 $('btn-start').onclick = () => { __pendingRun = { mode: 'normal', seed: (Math.random() * 4294967296) >>> 0 }; renderSetup(); showScreen('setup'); };  /* v5.19：普通局也种子化，战报可复现同款 */
 $('btn-to-draft').onclick = startDraft;
 $('btn-swap').onclick = () => { if (S.swapsLeft > 0 && !S.person) { S.swapsLeft--; rollFaction(); renderDraft(); } };
-/* ---------- 激励广告（vatask）：换一批 / 星运 / 锦囊 / 改命，共用一套状态 ---------- */
+/* ---------- 激励广告（vatask）：定向招募 / 星运 / 锦囊 / 改命 / 巅峰，共用一套状态 ---------- */
 /* ---------- 本地存档（v5.5）：看广告/误退导致页面重载时恢复进度 ---------- */
-const SAVE_KEY = 'shuihu_save_v1', PENDING_AD_KEY = 'shuihu_pending_ad';
+const SAVE_KEY = 'shuihu_save_v1', PENDING_AD_KEY = 'shuihu_pending_ad', PENDING_BG_KEY = 'shuihu_pending_ad_bg';
 let __restoring = false;
 let __dsgTimer = 0, __dsgPhase = 'draft';
 function deferSaveGame(phase) { /* v5.17 性能：夺技高频渲染的存档延迟 90ms 合并落盘，移出点击→绘制路径 */
@@ -5312,15 +5869,21 @@ function saveGame(phase) {
       v: 1, ts: Date.now(), phase,
       S: Object.assign({}, S, { claimed: [...S.claimed] }),
       rngState: __rngState,  /* v5.19：随机流状态随档走，继续上局仍可复现 */
-      tianmingBoost: !!tianmingBoost, rewindChapterUsed: rewindChapterUsed || 0
+      tianmingBoost: !!tianmingBoost, directedReady: !!directedReady, rewindChapterUsed: rewindChapterUsed || 0
     }));
   } catch (e) {}
 }
 function clearSave() {
-  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(PENDING_AD_KEY); } catch (e) {}
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(PENDING_AD_KEY); localStorage.removeItem(PENDING_BG_KEY); } catch (e) {}
 }
 function readSave() {
-  try { const d = JSON.parse(localStorage.getItem(SAVE_KEY)); return (d && d.S && d.S.route) ? d : null; }
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (!d || !d.S || !d.S.route) return null;
+    /* 判定落盘：chapter-settle/event-settle 都是章节阶段存档，路由与展示统一按 chapter 认（结算记录在 S.lastSettle 里） */
+    if (d.phase === 'chapter-settle' || d.phase === 'event-settle') d.phase = 'chapter';
+    return d;
+  }
   catch (e) { return null; }
 }
 function refreshContinueBtn() {
@@ -5355,9 +5918,119 @@ function restoreChapterView() {
   $('btn-chapter-next').classList.remove('on');
   fabaoRateBonus = fabaoBonusFor(ch);  /* 阶段二：恢复时重结算兵器加成 */
   if (ch.bossTag) $('ch-brief').innerHTML += `<span class="ch-checks">本章 Boss 兵器标签【${ch.bossTag}】· 被【${fabaoBeater(ch.bossTag)}】所克</span>`;
+  /* 判定落盘：本章已有结算记录时只重建结果视图（章节结果/事件结果态），绝不回选项页重选 */
+  const ls = S.lastSettle;
+  if (ls && ls.ch === n && ls.kind === 'chapter') { renderSettle(false); return; }
+  if (ls && ls.ch === n && ls.kind === 'event') {
+    $('ch-options').classList.add('hidden');
+    $('ch-result').classList.add('hidden');
+    $('btn-chapter-next').classList.remove('on');
+    refreshChapterUI();
+    syncAllAdBtns();
+    renderEventSettle();
+    return;
+  }
   renderChapterOptions(ch);
   refreshChapterUI();
   syncAllAdBtns();
+}
+/* ---------- 广告 PENDING 核对（v5.22 死锁改造：拼将三作同源同口径） ---------- */
+/* 待核队列＝主槽（PENDING_AD_KEY，单条对象、格式与旧版一致）＋后台槽（PENDING_BG_KEY，数组），上限 5 条，FIFO。
+   差量归因：核对时逐条 FIFO 落定，每条至多消费 1 个增量——落定一条后把消费水位 floor 抬到该条 base+1
+   并随队列落盘，后续条目须见更高增量才落定，杜绝同一增量被多条待核重复领取（不双发）。
+   凭当次回执发奖的广告同样抬 floor（其增量已被它自己领走），防旧待核误领。
+   唯一落定信号仍是服务端次数余额增量；无增量/查询失败/字段缺失一律未落定保留并记 checks/lastCheck 续核，
+   绝不凭任务 status==='completed' 发奖或删标记（沿 v5.21 H1/M3 口径）。
+   TTL 12h 且先核对后清理：超 12h 也先逐条核对，有增量照发；查询成功无增量才逐条清理并留痕，查询失败保留（沿 M2）。 */
+function readPendingQueue() {
+  let items = [], floor = 0;
+  try {
+    const raw = localStorage.getItem(PENDING_AD_KEY);
+    if (raw) {
+      const j = JSON.parse(raw);
+      if (j && j.type) { items.push(j); floor = j.floor || 0; }
+      else { try { localStorage.removeItem(PENDING_AD_KEY); } catch (e) {} }  /* 无类型旧标记：无从核对，作废 */
+    }
+  } catch (e) {}
+  try {
+    const raw2 = localStorage.getItem(PENDING_BG_KEY);
+    if (raw2) { const a = JSON.parse(raw2); if (Array.isArray(a)) items = items.concat(a.filter(x => x && x.type)); }
+  } catch (e) {}
+  return { items, floor };
+}
+function writePendingQueue(items, floor) {
+  if (!items.length) {
+    try { localStorage.removeItem(PENDING_AD_KEY); } catch (e) {}
+    try { localStorage.removeItem(PENDING_BG_KEY); } catch (e) {}
+    return;
+  }
+  const head = Object.assign({}, items[0], { floor: floor || 0 });  /* floor 记在主槽条目上随队列落盘 */
+  try { localStorage.setItem(PENDING_AD_KEY, JSON.stringify(head)); } catch (e) {}
+  if (items.length > 1) { try { localStorage.setItem(PENDING_BG_KEY, JSON.stringify(items.slice(1))); } catch (e) {} }
+  else { try { localStorage.removeItem(PENDING_BG_KEY); } catch (e) {} }
+}
+async function settlePendingAd() {
+  const q = readPendingQueue();
+  if (!q.items.length) return { state: 'none', granted: [], expired: [], remaining: [] };
+  await refreshAdState();
+  if (!adStateOk) { await new Promise(r => setTimeout(r, 900)); await refreshAdState(); }  /* SDK 注入稍晚时给一次重试 */
+  let floor = q.floor || 0;
+  const granted = [], expired = [], remaining = [];
+  for (const p of q.items) {
+    if (adStateOk && typeof p.base === 'number' && typeof adChanceCount === 'number' && adChanceCount > Math.max(p.base, floor)) {
+      granted.push(p);
+      floor = Math.max(p.base, floor) + 1;  /* 本条消费 1 个增量，水位抬升，后条不得重复消费 */
+      continue;
+    }
+    const isExpired = Date.now() - (p.ts || 0) >= 12 * 3600 * 1000;
+    if (isExpired && adStateOk) {  /* 查询成功但无增量（含基线/字段缺失无法比对）：超 12h 清理留痕，防永久堵死；查询失败则继续保留 */
+      expired.push(p);
+      try { console.warn('[ad-pending] 超过12h且核对无增量，已清理过期标记', p.type, p.token || ''); } catch (e) {}
+      continue;
+    }
+    p.checks = (p.checks || 0) + 1; p.lastCheck = Date.now();
+    remaining.push(p);
+  }
+  writePendingQueue(remaining, floor);
+  return { state: granted.length ? 'granted' : (expired.length ? 'expired' : 'undecided'), granted, expired, remaining };
+}
+function applyPendingAdGrant(p, toChapter) {
+  let grantedMsg = '';
+  if (!toChapter && p.type === 'swap') {
+    S.swapsLeft++;
+    grantedMsg = '广告奖励已补发：换一批 +1 次';
+  } else if (!toChapter && p.type === 'directed') {
+    directedReady = true;
+    grantedMsg = '广告奖励已补发：定向招募已就绪——去夺技页自选来路';
+  } else if (!toChapter && p.type === 'tianming') {
+    tianmingBoost = true;
+    rollFaction();
+    grantedMsg = '广告奖励已补发：星运临身——本批贵人云集';
+  } else if (!toChapter && p.type === 'peak' && p.snap && p.snap.name) {
+    const pp = findPersonByName(p.snap.name);
+    if (pp && applyPeak(pp)) grantedMsg = '广告奖励已补发：巅峰再临——' + pp.name + ' 已至生涯巅峰';
+  } else if (toChapter && p.type === 'jinnang') {
+    S.jinnang = true;
+    grantedMsg = '广告奖励已补发：锦囊已备下';
+  } else if (toChapter && p.type === 'rewind' && p.snap) {
+    const snap = p.snap;
+    S.health = snap.health; S.troops = snap.troops; S.sec = snap.sec; S.merit = snap.merit;
+    S.scenes = snap.scenes; S.taunts = snap.taunts; S.personalFail = snap.personalFail;
+    S.selfStreak = snap.selfStreak; S.bios = snap.bios; S.flags = snap.flags; S.attrs = snap.attrs;
+    S.deadPending = false; S.gamble = false;
+    S.lastSettle = null; S.rewindSnap = null; S.rewindAvail = false; rewindSnapshot = null; rewindAvailable = false;
+    S.rewindLeft = Math.max(0, (S.rewindLeft || 0) - 1);
+    rewindChapterUsed = S.ch;
+    grantedMsg = '广告奖励已补发：改命成功——回到抉择之前';
+  } else if (!toChapter && p.type === 'chase' && p.snap && p.snap.partner) {
+    S.bondChase = p.snap.partner;
+    rollFaction();
+    grantedMsg = '广告奖励已补发：追羁绊——' + p.snap.partner + ' 已在本批候选之中';
+  } else if (p.type === 'befriend' && p.snap && p.snap.bond) {
+    applyBondBefriend(p.snap.bond);
+    grantedMsg = '广告奖励已补发：化敌为友——宿敌尽解，两人各 +4';
+  }
+  return grantedMsg;
 }
 async function restoreGame() {
   const d = readSave();
@@ -5370,71 +6043,73 @@ async function restoreGame() {
   S.mode = S.mode || 'normal'; if (S.scheme === undefined) S.scheme = null;  /* v5.19：旧存档兜底 */
   if (typeof d.rngState === 'number') __rngState = d.rngState >>> 0; else __rngState = null;  /* v5.19 */
   tianmingBoost = !!d.tianmingBoost;
+  directedReady = !!d.directedReady;
   rewindChapterUsed = d.rewindChapterUsed || 0;
-  rewindSnapshot = null; rewindAvailable = false;
+  /* 判定落盘：旧存档无新字段时兜底；改命快照与可用标记随档重建，恢复后改命照常可用且仅一次 */
+  S.lastSettle = S.lastSettle || null;
+  S.rewindSnap = S.rewindSnap || null;
+  if (S.evDoneCh === undefined) S.evDoneCh = null;
+  rewindSnapshot = S.rewindSnap ? JSON.parse(JSON.stringify(S.rewindSnap)) : null;
+  rewindAvailable = !!S.rewindAvail && !!rewindSnapshot && (S.rewindLeft || 0) > 0 && rewindChapterUsed !== S.ch;
+  /* v5.23 羁绊存档 normalize：以存档本体（d.S）为准判断新旧（合并后的 S 会残留页面旧值，不可信）——旧档无羁绊字段时兜底：baseAttrs 以旧 attrs（即锁定原值）为快照，其余从零起 */
+  const __os = d.S;
+  S.baseAttrs = (__os.baseAttrs && typeof __os.baseAttrs === 'object' && Object.keys(__os.baseAttrs).length) ? S.baseAttrs : Object.assign({}, S.attrs);
+  S.bonds = (S.bonds && typeof S.bonds === 'object') ? S.bonds : {};
+  S.foeMarks = Array.isArray(__os.foeMarks) ? __os.foeMarks : [];
+  S.befriended = (__os.befriended && typeof __os.befriended === 'object') ? __os.befriended : {};
+  S.bondFx = (typeof __os.bondFx === 'number') ? __os.bondFx : 0;
+  S.chaseUsed = (typeof __os.chaseUsed === 'number') ? __os.chaseUsed : 0;
+  S.bondChase = (__os.bondChase === undefined) ? null : __os.bondChase;
+  S.bondFreeRewind = (typeof __os.bondFreeRewind === 'number') ? __os.bondFreeRewind : 0;
+  S.bondTempNext = !!__os.bondTempNext;
+  S.bondNotes = Array.isArray(__os.bondNotes) ? __os.bondNotes : [];
+  S.bondLinkUsed = !!__os.bondLinkUsed;
+  if (S.__unveilBase === undefined) S.__unveilBase = null;
+  S.bondRewindAvail = !!__os.bondRewindAvail;
+  bondRewindAvail = !!__os.bondRewindAvail && (S.bondFreeRewind || 0) > 0 && !!rewindSnapshot && rewindChapterUsed !== S.ch;
   /* 读 PENDING 待发奖励标记（旧版无 type 标记自然降级为仅恢复进度） */
   /* v5.18：核对落定前不删标记——旧版先删后查，平台口径一对不上奖励就永久丢失（真机实锤） */
-  let adInterrupted = false, pendingAd = null;
-  try {
-    const raw = localStorage.getItem(PENDING_AD_KEY);
-    if (raw) {
-      adInterrupted = true;
-      const j = JSON.parse(raw);
-      if (j && j.type && Date.now() - (j.ts || 0) < 30 * 60 * 1000) pendingAd = j;
-      else localStorage.removeItem(PENDING_AD_KEY);  /* 无类型/已过期：作废 */
-    }
-  } catch (e) {}
+  let adInterrupted = false, pendingAd = null, adExpiredMsg = '', adPendingMsg = '';
+  /* v5.22：待核队列（主槽＋后台槽）整体读取，逐条经 settlePendingAd 核对；此处不再按龄作废、不再先删后查 */
+  const q0 = readPendingQueue();
+  if (q0.items.length) adInterrupted = true;
   const toChapter = d.phase === 'chapter' && S.ch >= 1;
   /* 向平台核对（不凭本地标记自行发放）：主信号＝服务端次数余额较看广告前增加——完播由服务端自动记账、跨重载不丢；
-     v5.14–v5.17 的旧标记无基线时，退回任务 status 口径；查不到平台状态则保留标记、下次读档再核 */
+     v5.22：统一走 settlePendingAd 逐条核对待核队列——见增量才落定发奖；未落定的保留续核（短暂拦截只发生在拉起新广告时，见 playRewardAd），
+     绝不凭任务 status 发奖或删标记（沿 H1/M3 口径） */
   let grantedMsg = '';
-  if (pendingAd) {
-    await refreshAdState();
-    if (!adStateOk) { await new Promise(r => setTimeout(r, 900)); await refreshAdState(); }  /* SDK 注入稍晚时给一次重试 */
-    let verified = false, decided = false;
-    if (adStateOk) {
-      decided = true;
-      if (typeof pendingAd.base === 'number' && typeof adChanceCount === 'number') verified = adChanceCount > pendingAd.base;
-      else verified = adTaskCompleted;
-    }
-    if (verified) {
-      if (!toChapter && pendingAd.type === 'swap') {
-        S.swapsLeft++;
-        grantedMsg = '广告奖励已补发：换一批 +1 次';
-      } else if (!toChapter && pendingAd.type === 'tianming') {
-        tianmingBoost = true;
-        rollFaction();
-        grantedMsg = '广告奖励已补发：星运临身——本批贵人云集';
-      } else if (!toChapter && pendingAd.type === 'peak' && pendingAd.snap && pendingAd.snap.name) {
-        const pp = findPersonByName(pendingAd.snap.name);
-        if (pp && applyPeak(pp)) grantedMsg = '广告奖励已补发：巅峰再临——' + pp.name + ' 已至生涯巅峰';
-      } else if (toChapter && pendingAd.type === 'jinnang') {
-        S.jinnang = true;
-        grantedMsg = '广告奖励已补发：锦囊已备下';
-      } else if (toChapter && pendingAd.type === 'rewind' && pendingAd.snap) {
-        const snap = pendingAd.snap;
-        S.health = snap.health; S.troops = snap.troops; S.sec = snap.sec; S.merit = snap.merit;
-        S.scenes = snap.scenes; S.taunts = snap.taunts; S.personalFail = snap.personalFail;
-        S.selfStreak = snap.selfStreak; S.bios = snap.bios; S.flags = snap.flags; S.attrs = snap.attrs;
-        S.deadPending = false; S.gamble = false;
-        S.rewindLeft = Math.max(0, (S.rewindLeft || 0) - 1);
-        rewindChapterUsed = S.ch;
-        grantedMsg = '广告奖励已补发：改命成功——回到抉择之前';
-      }
-    }
-    if (verified || decided) { try { localStorage.removeItem(PENDING_AD_KEY); } catch (e) {} }  /* v5.18：核对落定才删；未决保留 */
+  if (q0.items.length) {
+    const st = await settlePendingAd();
+    const msgs = [];
+    for (const gp of st.granted) { const m = applyPendingAdGrant(gp, toChapter); if (m) msgs.push(m); }
+    grantedMsg = msgs.join('；');
+    if (!grantedMsg && st.expired.length) adExpiredMsg = '上一支广告奖励超过 12 小时未落账，已清理';
+    else if (st.remaining.length && !grantedMsg) adPendingMsg = '上一支广告奖励待核对，下次进入会继续核对';
+    pendingAd = st.remaining.length ? st.remaining[0] : null;
   }
   if (toChapter) {
     showScreen('chapter');
     restoreChapterView();
     if (!pendingAd) refreshAdState();
     if (grantedMsg) chAdToast(grantedMsg);
+    else if (adExpiredMsg) chAdToast(adExpiredMsg);
+    else if (adPendingMsg) chAdToast(adPendingMsg);
     else if (adInterrupted) chAdToast('上次广告中断了，进度已恢复到看广告之前');
+  } else if (S.picks >= 12 && S.__unveilBase) {
+    settleUnveil();
+    showScreen('unveil');
+    if (!pendingAd) refreshAdState();
+    if (grantedMsg) showGameToast(grantedMsg);
+    else if (adExpiredMsg) showGameToast(adExpiredMsg);
+    else if (adPendingMsg) showGameToast(adPendingMsg);
   } else {
+    try { recomputeBonds(); } catch (e) {}  /* v5.23：恢复夺技先从 baseAttrs 重建 attrs（旧档同口径），再渲染 */
     showScreen('draft');
     renderDraft();
     if (!pendingAd) refreshAdState();
     if (grantedMsg) adToast(grantedMsg);
+    else if (adExpiredMsg) adToast(adExpiredMsg);
+    else if (adPendingMsg) adToast(adPendingMsg);
     else if (adInterrupted) adToast('上次广告中断了，进度已恢复到看广告之前');
   }
   __restoring = false;
@@ -5526,9 +6201,9 @@ function loadCollection() {
   if (__colCache) return __colCache;
   try {
     const c = JSON.parse(localStorage.getItem(COLLECTION_KEY));
-    if (c && typeof c === 'object') { __colCache = Object.assign({ endings:{}, people:{}, ach:{}, fates:{}, locks:0, runs:0 }, c); return __colCache; }
+    if (c && typeof c === 'object') { __colCache = Object.assign({ endings:{}, people:{}, ach:{}, fates:{}, locks:0, runs:0, bondsSeen:{}, bondStories:{} }, c); return __colCache; }
   } catch (e) {}
-  __colCache = { endings:{}, people:{}, ach:{}, fates:{}, locks:0, runs:0 };
+  __colCache = { endings:{}, people:{}, ach:{}, fates:{}, locks:0, runs:0, bondsSeen:{}, bondStories:{} };
   return __colCache;
 }
 function flushCollection() {
@@ -5799,7 +6474,7 @@ async function loadBoard(kind) {
     const medal = r => r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : r;
     const rowHTML = r => {
       const sub = baseKind === 'best' ? `${lbEsc(r.ending || '')} · 聚义值 ${r.score}` : `殁于第 ${r.deathCh} 章 · ${lbEsc(r.ending || '')} · ${r.score} 分`;
-      return `<div class="lb-row${r.isCurrent ? ' me' : ''}${r.rank <= 3 ? ' top' + r.rank : ''}"><span class="lb-rank">${medal(r.rank)}</span>${r.avatar ? `<img src="${lbEsc(r.avatar)}" alt="">` : '<img alt="">'}<span style="flex:1;min-width:0;"><span class="lb-name">${lbEsc(r.displayName || '虎扑用户')}${r.isCurrent ? '（我）' : ''}</span><br><span class="lb-sub">${sub}</span></span></div>`;
+      return `<div class="lb-row${r.isCurrent ? ' me' : ''}${r.rank <= 3 ? ' top' + r.rank : ''}"><span class="lb-rank">${medal(r.rank)}</span>${r.avatar ? `<img src="${lbEsc(r.avatar)}" alt="" loading="lazy" decoding="async">` : '<img alt="">'}<span style="flex:1;min-width:0;"><span class="lb-name">${lbEsc(r.displayName || '虎扑用户')}${r.isCurrent ? '（我）' : ''}</span><br><span class="lb-sub">${sub}</span></span></div>`;
     };
     if (!entries.length) list.innerHTML = '<p class="hint">暂无数据，来打第一局开榜。</p>';
     else list.innerHTML = entries.map(rowHTML).join('');
@@ -5872,11 +6547,11 @@ const ENDING_HINTS = {
       total++;
       const has = !!c.people[p.name];
       if (has) got++;
-      if (p.hiddenS && !has) return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px dashed rgba(120,96,40,.45);border-radius:10px;opacity:.8;">
+      if (p.hiddenS && !has) return `<div class="gal-cell" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px dashed rgba(120,96,40,.45);border-radius:10px;opacity:.8;">
         <span>${avatarHTML('？')}</span>
         <span style="font-size:12px;opacity:.6;">？？？</span>
         <span style="font-size:10px;color:#dbb758;">五色神光 · 未显形</span></div>`;
-      return `<button data-gal-person="${p.name}" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px solid ${has ? 'rgba(160,124,32,.55)' : 'rgba(120,96,40,.25)'};border-radius:10px;background:${has ? '#f1e7cd' : 'transparent'};cursor:pointer;">
+      return `<button class="gal-cell" data-gal-person="${p.name}" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:1px solid ${has ? 'rgba(160,124,32,.55)' : 'rgba(120,96,40,.25)'};border-radius:10px;background:${has ? '#f1e7cd' : 'transparent'};cursor:pointer;">
         <span style="${has ? '' : 'filter:grayscale(1);opacity:.4;'}">${avatarHTML(p.name)}</span>
         <span style="font-size:12px;${has ? 'font-weight:700;' : 'opacity:.55;'}">${p.name}</span>
         <span style="font-size:10px;color:#dbb758;">${p.tier} 级</span></button>`;
@@ -5916,10 +6591,13 @@ $('btn-records-gallery').onclick = openGallery;
 $('btn-gallery-back').onclick = () => showScreen('home');
 
 let adBusy = false, adRewardDone = false, lastAdMsg = '';
-let adTaskCompleted = false;  /* v5.14.1：平台任务状态快照（completed=本周期已完成，非单次完播凭证），v5.18 起仅作旧标记无基线时的补发 fallback */
+let adTaskCompleted = false;  /* v5.14.1：平台任务状态快照（completed=本周期已完成，非单次完播凭证）；v5.21 起不再用于发奖/删标记判定——补发只认次数增量 */
 let adChanceCount = null, adStateOk = false;  /* v5.18：平台服务端次数余额快照——完播由服务端自动记账、跨重载不丢，补发核对主信号 */
 let tianmingBoost = false;
+let directedReady = false;  /* 定向招募：看广告得资格、自选势力消费，落盘防重载丢失 */
 let rewindSnapshot = null, rewindChapterUsed = 0, rewindAvailable = false;
+let bondRewindAvail = false;  /* v5.23 羁绊免费改命可用（全局镜像，随 S.bondRewindAvail 落盘） */
+try { updateBondsBtn(); } catch (e) {}  /* v5.23：首屏渲染羁绊收集计数（须在 __colCache 声明之后调用，防 TDZ） */
 function vataskReady() {
   return !!(window.ColorboxAI && window.ColorboxAI.vatask && typeof window.ColorboxAI.vatask.completeRewardVideo === 'function');
 }
@@ -5927,32 +6605,76 @@ async function playRewardAd(kind, snap) {
   /* v5.14.1：不预锁——以 SDK 返回为准，仅平台以 reason=UNAVAILABLE 明拒才置 adRewardDone 锁按钮 */
   if (adBusy || !vataskReady()) return false;
   flushDeferredSaves();  /* v5.17：拉起广告前先刷盘延迟中的存档/收藏 */
+  /* v5.22（死锁改造，取代 v5.21 M4 的「未落定即阻止」）：已有未落定 PENDING 时先逐条核对——已落定的先补发；
+     仍未落定的只许短暂拦截：拦截条件＝该条年龄 ≤3 分钟且本次核对后 checks ≤2（restore 时的自动核对占 1 次）；
+     超过 3 分钟、或已核对多次仍无增量，必须放行新广告——旧标记不删不覆写，转待核队列后台续核，见增量照发，
+     绝不再把「中途退出、平台永不记账」的玩家锁死到 12h 过期（足坛/篮坛线上版实证教训） */
+  const qPre = readPendingQueue();
+  if (qPre.items.length) {
+    const st = await settlePendingAd();
+    for (const gp of st.granted) {
+      const msg = applyPendingAdGrant(gp, gp.type === 'jinnang' || gp.type === 'rewind');
+      if (msg) { if (window.__curScreen === 'chapter') chAdToast(msg); else adToast(msg); }
+    }
+    if (!st.granted.length && st.expired.length) {
+      const em = '上一支广告奖励已过期（超过 12 小时未落账），已清理';
+      if (window.__curScreen === 'chapter') chAdToast(em); else adToast(em);
+    }
+    if (st.remaining.length) {
+      const nowTs = Date.now();
+      const blocking = st.remaining.some(e => nowTs - (e.ts || 0) <= 3 * 60 * 1000 && (e.checks || 0) <= 2);
+      if (blocking) {
+        lastAdMsg = '上一支广告奖励核对中，请稍候片刻再试';
+        return false;
+      }
+      /* 放行：旧标记保留在待核队列后台续核，不弹提示吓人 */
+    }
+  }
   await refreshAdState();  /* v5.18：记下看广告前的服务端次数余额，作 PENDING 核对基线 */
   /* 拉起广告前先落盘＋留 PENDING 标记，防容器重载丢奖励 */
-  /* PENDING 标记记待发奖励类型与余额基线，重载后由 restoreGame 凭平台余额差量核对补发 */
-  try { localStorage.setItem(PENDING_AD_KEY, JSON.stringify({ type: kind || '', ts: Date.now(), snap: snap || null, base: adChanceCount })); } catch (e) {}
+  /* PENDING 标记记待发奖励类型、余额基线与唯一 token（时间戳＋点位＋随机数），重载后凭平台余额差量核对补发 */
+  const adToken = Date.now() + '-' + (kind || '') + '-' + Math.random().toString(36).slice(2, 10);
+  const q2 = readPendingQueue();
+  let floor2 = q2.floor || 0;
+  const items2 = q2.items.concat([{ type: kind || '', ts: Date.now(), snap: snap || null, base: adChanceCount, token: adToken }]);
+  if (items2.length > 5) { const dropped = items2.shift(); try { console.warn('[ad-pending] 待核队列已满(5)，清理最早一条', dropped.type, dropped.token || ''); } catch (e) {} }
+  writePendingQueue(items2, floor2);
   saveGame(window.__curScreen === 'chapter' ? 'chapter' : 'draft');
   adBusy = true; lastAdMsg = ''; syncAllAdBtns();
-  let ok = false;
+  let ok = false, receipt = 'none';  /* receipt：ok＝明确获奖回执；denied＝平台明确回执未获奖；none＝抛错/无回执 */
   try {
     const res = await window.ColorboxAI.vatask.completeRewardVideo();
-    ok = !!(res && res.code === 200 && res.data && res.data.rewarded);
-    if (!ok) {
-      lastAdMsg = (res && res.message) || '未获得奖励';
-      if (res && res.data && res.data.reason === 'UNAVAILABLE') adRewardDone = true;  /* 平台明示任务已完成/不可用才锁定 */
-    }
-  } catch (e) { lastAdMsg = '广告拉起失败，请重试'; }
+    if (res && res.code === 200 && res.data && res.data.rewarded) { ok = true; receipt = 'ok'; }
+    else if (res && res.data && res.data.reason === 'UNAVAILABLE') { receipt = 'denied'; adRewardDone = true; lastAdMsg = (res && res.message) || '未获得奖励'; }  /* 平台明示任务已完成/不可用才锁定 */
+    else if (res && res.code === 200 && res.data) { receipt = 'denied'; lastAdMsg = (res && res.message) || '未获得奖励'; }
+    else lastAdMsg = (res && res.message) || '广告回执异常，奖励将自动核对补发';
+  } catch (e) { lastAdMsg = '广告回执异常，奖励将自动核对补发'; }
   adBusy = false;
   await refreshAdState();
-  try { localStorage.removeItem(PENDING_AD_KEY); } catch (e) {}
+  /* v5.22（H2 沿用＋队列化）：仅在平台给出明确回执（获奖或明确未获奖）时才删本条 PENDING（按 token 精确删，不动队列其他条目）；
+     抛错/无回执时保留本条，交 restoreGame/settlePendingAd 凭余额差量核对补发，不再无条件删除。
+     获奖时同步抬升消费水位 floor＝本条 base+1：这支增量已被本条凭回执领走，防队列里的旧待核误领双发 */
+  if (receipt !== 'none') {
+    const q3 = readPendingQueue();
+    const idx = q3.items.findIndex(e => e.token === adToken);
+    if (idx >= 0) {
+      const ent = q3.items[idx];
+      q3.items.splice(idx, 1);
+      let fl = q3.floor || 0;
+      if (receipt === 'ok' && typeof ent.base === 'number') fl = Math.max(fl, ent.base + 1);
+      writePendingQueue(q3.items, fl);
+    }
+  }
   return ok;
 }
 function syncAllAdBtns() {
   const vis = !!window.__adVisible;
-  const swap = $('btn-ad-swap');
-  swap.classList.toggle('hidden', !vis);
-  swap.disabled = adBusy || adRewardDone || !!S.person;
-  swap.textContent = adRewardDone ? '📺 广告奖励已领完' : (adBusy ? '📺 广告播放中…' : '📺 看广告换一批');
+  const dr = $('btn-ad-directed');
+  dr.classList.toggle('hidden', !vis);
+  dr.disabled = adBusy || adRewardDone || !!S.person || directedReady;
+  dr.textContent = adRewardDone ? '📺 广告奖励已领完' : (adBusy ? '📺 广告播放中…' : (directedReady ? '📺 定向招募已就绪（先选来路）' : '📺 定向招募（看广告，自选来路）'));
+  const du = $('btn-directed-use');
+  if (du) { du.classList.toggle('hidden', !(directedReady && !S.person)); du.disabled = adBusy; }
   const tm = $('btn-ad-tianming');
   tm.classList.toggle('hidden', !vis);
   tm.disabled = adBusy || adRewardDone || !!S.person;
@@ -5969,6 +6691,13 @@ function syncAllAdBtns() {
     rw.disabled = adBusy || adRewardDone;
     rw.textContent = adBusy ? '📺 广告播放中…' : `📺 看广告·改命（回到这次抉择之前，本局剩 ${S.rewindLeft || 0} 次）`;
   }
+  const brw = $('btn-bond-rewind');
+  if (brw) {
+    brw.classList.toggle('hidden', !bondRewindAvail);
+    brw.disabled = adBusy;
+    brw.textContent = `💞 羁绊·免费改命（回到这次抉择之前，剩 ${S.bondFreeRewind || 0} 次）`;
+  }
+  renderBondBars();  /* v5.23：追羁绊/化敌按钮随广告可见性与局内状态刷新 */
 }
 function adToast(msg) {
   const t = $('ad-toast');
@@ -5989,7 +6718,7 @@ async function refreshAdState() {
     const st = await window.ColorboxAI.vatask.getActivityTaskState();
     if (st && st.code === 200 && st.data) {
       const task = (st.data.tasks || []).find(x => x.taskCode === 'reward');
-      adTaskCompleted = !!(task && task.status === 'completed');  /* 仅供 restoreGame 补发核对，不再据此预锁广告按钮（v5.14.1） */
+      adTaskCompleted = !!(task && task.status === 'completed');  /* 仅作状态快照（v5.21 起不参与补发判定），不再据此预锁广告按钮（v5.14.1） */
       adChanceCount = (typeof st.data.availableChanceCount === 'number') ? st.data.availableChanceCount : null;  /* v5.18：服务端次数余额 */
       adStateOk = true;
       window.__adVisible = true;
@@ -6000,14 +6729,16 @@ async function refreshAdState() {
   } catch (e) { adStateOk = false; window.__adVisible = false; }
   syncAllAdBtns();
 }
-$('btn-ad-swap').onclick = async () => {
-  if (adBusy || adRewardDone || S.person) return;
-  if (await playRewardAd('swap')) {
-    S.swapsLeft++;
-    adToast('已获得 1 次换一批');
-    renderDraft();
+$('btn-ad-directed').onclick = async () => {
+  if (adBusy || adRewardDone || S.person || directedReady) return;
+  if (await playRewardAd('directed')) {
+    directedReady = true;
+    saveGame('draft');
+    syncAllAdBtns();
+    openDirectedPicker();
   } else if (lastAdMsg) adToast(lastAdMsg);
 };
+$('btn-directed-use').onclick = () => { if (directedReady && !S.person) openDirectedPicker(); };
 $('btn-ad-tianming').onclick = async () => {
   if (adBusy || adRewardDone || S.person) return;
   if (await playRewardAd('tianming')) {
@@ -6034,6 +6765,7 @@ $('btn-ad-rewind').onclick = async () => {
     S.scenes = snap.scenes; S.taunts = snap.taunts; S.personalFail = snap.personalFail;
     S.selfStreak = snap.selfStreak; S.bios = snap.bios; S.flags = snap.flags; S.attrs = snap.attrs;
     S.deadPending = false; S.gamble = false;
+    S.lastSettle = null; S.rewindSnap = null; S.rewindAvail = false;
     S.rewindLeft--; rewindChapterUsed = S.ch; rewindAvailable = false; rewindSnapshot = null;
     $('ch-result').classList.add('hidden');
     renderChapterOptions(curChapter());
@@ -6041,6 +6773,22 @@ $('btn-ad-rewind').onclick = async () => {
     saveGame('chapter');
     chAdToast('改命成功——回到抉择之前');
   } else if (lastAdMsg) chAdToast(lastAdMsg);
+};
+$('btn-bond-rewind').onclick = () => {
+  if (adBusy || !bondRewindAvail || (S.bondFreeRewind || 0) <= 0 || !rewindSnapshot || rewindChapterUsed === S.ch) return;
+  const snap = rewindSnapshot;
+  S.health = snap.health; S.troops = snap.troops; S.sec = snap.sec; S.merit = snap.merit;
+  S.scenes = snap.scenes; S.taunts = snap.taunts; S.personalFail = snap.personalFail;
+  S.selfStreak = snap.selfStreak; S.bios = snap.bios; S.flags = snap.flags; S.attrs = snap.attrs;
+  S.deadPending = false; S.gamble = false;
+  S.lastSettle = null; S.rewindSnap = null; S.rewindAvail = false;
+  S.bondFreeRewind--; rewindChapterUsed = S.ch; rewindAvailable = false; rewindSnapshot = null;
+  bondRewindAvail = false; S.bondRewindAvail = false;
+  $('ch-result').classList.add('hidden');
+  renderChapterOptions(curChapter());
+  refreshChapterUI();
+  saveGame('chapter');
+  chAdToast('羁绊改命成功——回到抉择之前');
 };
 $('btn-to-chapters').onclick = startChapters;
 $('btn-to-poster').onclick = renderPoster;
